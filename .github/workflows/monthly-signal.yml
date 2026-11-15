@@ -1,16 +1,25 @@
 name: monthly-signal
 
 # 月末自动判定创业红利比价定投信号。
-# UTC 07:30 = 北京时间 15:30。每月 28–31 日触发，脚本自己判断当天是否本月最后一个工作日，
-# 不是就 SKIP 退出，不会产生空 commit。也可在 Actions 页面手动 Run workflow 补跑任意日期。
+#
+# 为什么是每天触发、而不是「每月 28-31 日」：
+#   A 股月末最后交易日会跑到 28 号之前（2026-02-27、2027-02-26），
+#   旧窗口会整月不触发而永久丢一期；且月末当天 15:30 若腾讯接口还没出 K 线，
+#   脚本退出 0 后次日又因「不是月末」再次退出 0，同样永久丢失。
+#   现在由 cron 每天叫一次（公共仓库 Actions 免费不限分钟），
+#   该不该跑、要不要回补，全部交给 monthly_update.resolve_target() 判断。
+#   非目标日只打印一行 SKIP 就退出，不产生空 commit。
+#
+# 手动补跑：Actions 页面 → Run workflow → date 填 YYYY-MM-DD。
+# 自检日历：在 .github/scripts 下跑 `python monthly_update.py --calendar`。
 
 on:
   schedule:
-    - cron: "30 7 28-31 * *"
+    - cron: "30 7 * * *"   # UTC 07:30 = 北京 15:30，收盘后半小时
   workflow_dispatch:
     inputs:
       date:
-        description: "指定日期 YYYY-MM-DD（留空 = 自动判断本月最后工作日）"
+        description: "指定日期 YYYY-MM-DD（留空 = 自动判断本月最后交易日）"
         required: false
         default: ""
 
@@ -33,6 +42,14 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: 交易日历自检
+        working-directory: .github/scripts
+        run: python monthly_update.py --calendar
+
+      - name: 判定测试（不联网）
+        working-directory: .github/scripts
+        run: python test_resolve_target.py
 
       - name: 计算并更新信号
         working-directory: .github/scripts
