@@ -1,5 +1,5 @@
 {
-  "source": "创业红利比价定投跟踪表 V1.1 / 比价定投使用手册 V1.0",
+  "source": "GitHub 仓库 history.json（原腾讯文档跟踪表已归档，公式已逐位复现）",
   "strategy": "比价 = 创业板指(399006) ÷ 中证红利(000922)；上轨=历史85%分位，下轨=15%分位；月末判定，次月首个交易日下单",
   "etf": {
     "创业板": "159915",
@@ -164,6 +164,6 @@
       "pct": 50
     }
   ],
-  "synced_at": "2026-11-15 11:26:53",
+  "synced_at": "2026-11-15 22:05:13",
   "doc_url": "https://docs.qq.com/sheet/DVUZjVWhGdkZ0aGNj?_fid=UFcUhFvFthcc"
 }
