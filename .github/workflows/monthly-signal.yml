@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: "指定日期 YYYY-MM-DD（留空 = 自动判断本月最后交易日）"
+        description: "补跑日期 YYYY-MM-DD，必须是该月最后交易日（留空 = 自动判断）"
         required: false
         default: ""
 
