@@ -93,6 +93,31 @@ case("2027-01-02 回补 2026-12-31", hist("2026-11-30"), at(2027, 1, 2, 16, 0), 
 case("2027-01-04 回补（含元旦，day<=5）", hist("2026-11-30"), at(2027, 1, 4, 16, 0), datetime.date(2026, 12, 31))
 
 print()
+print("=== 场景 8：月末闸门 month_end_error（月中日期必须被拒绝） ===")
+gate = [
+    # 日期              是否应通过  说明
+    ("2026-10-30", True,  "10 月最后交易日"),
+    ("2026-11-30", True,  "11 月最后交易日"),
+    ("2026-11-02", False, "腾讯文档遗留的月中快照，必须拒绝"),
+    ("2026-11-12", False, "手动补跑误填的月中日期，必须拒绝"),
+    ("2026-11-28", False, "月末前的周六"),
+    ("2026-02-27", True,  "2 月最后交易日早于 28 号"),
+    ("2027-02-26", True,  "2027 年 2 月最后交易日"),
+    ("2027-10-29", True,  "2027 年 10 月最后交易日（10-30/31 周末）"),
+    ("2027-10-01", False, "国庆当天"),
+    ("2026-09-25", False, "中秋当天"),
+]
+for iso, should_pass, note in gate:
+    d = datetime.datetime.strptime(iso, "%Y-%m-%d").date()
+    err = mu.month_end_error(d)
+    ok = (err is None) == should_pass
+    if not ok:
+        FAIL.append("闸门 " + iso)
+    print("%s %-12s 应%s  实际%s   %s" % (
+        "PASS" if ok else "FAIL", iso, "通过" if should_pass else "拒绝",
+        "通过" if err is None else "拒绝", note))
+
+print()
 if FAIL:
     print("FAILED %d 项：" % len(FAIL))
     for f in FAIL:
