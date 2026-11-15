@@ -203,7 +203,9 @@ def write_outputs(hist, rows, stamp):
 
     hist["rows"] = rows
     hist["meta"]["updated"] = stamp
-    with open(HISTORY, "w", encoding="utf-8") as f:
+    # newline="\n"：本地（Windows）也写 LF，与云端 Linux runner 输出字节一致。
+    # 否则本地一次 CRLF、云端一次 LF，每次跑完 git 都会整文件重写，diff 全红。
+    with open(HISTORY, "w", encoding="utf-8", newline="\n") as f:
         json.dump(hist, f, ensure_ascii=False, indent=1)
 
     with open(DATA, "r", encoding="utf-8") as f:
@@ -215,7 +217,7 @@ def write_outputs(hist, rows, stamp):
     data["source"] = SOURCE_LABEL
     # 交易日历一并下发给看板，让「距月末判定」用的休市表只有这一个事实源
     data["holidays"] = sorted(HOLIDAYS)
-    with open(DATA, "w", encoding="utf-8") as f:
+    with open(DATA, "w", encoding="utf-8", newline="\n") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
     log("已写 history.json（%d 期）与 data.json（最近 %d 期）" % (len(rows), len(recent)))
     return cur
