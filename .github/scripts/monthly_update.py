@@ -111,6 +111,20 @@ def prev_month(year, month):
     return (year - 1, 12) if month == 1 else (year, month - 1)
 
 
+def month_end_error(d):
+    """目标日必须是当月最后交易日；是则返回 None，否则返回错误说明。
+
+    策略只在「每月最后一个交易日收盘」定盘，月中日期写进来会变成一行假的比价。
+    这条曾经被人为绕过：腾讯文档里遗留过 2026-11-02（差月末 28 天），
+    手动补跑也误填过 2026-11-12，页面上就会显示一个不存在的月度信号。
+    """
+    last = last_trading_day(d.year, d.month)
+    if d != last:
+        return "%s 不是 %d 月的最后交易日（%s），差 %d 天；策略只在月末定盘" % (
+            d, d.month, last, (last - d).days)
+    return None
+
+
 def resolve_target(rows, now=None):
     """
     返回 (目标交易日, 是否手动指定)；无需执行时返回 (None, False)。
@@ -246,8 +260,16 @@ def main(argv=None):
     if today is None:
         return 0
     if forced:
-        log("手动指定日期：%s（跳过月末与收盘时间检查）" % today)
-    elif not is_trading_day(today):
+        log("手动指定日期：%s" % today)
+
+    # 无论手动还是自动，目标必须是当月最后交易日。手动补跑最容易在这里出错。
+    err = month_end_error(today)
+    if err:
+        log("ERROR " + err)
+        log("      请在 Actions 的 date 里填该月最后交易日，或留空让脚本自动判断。")
+        return 1
+
+    if not is_trading_day(today):
         log("SKIP %s 不是交易日（周末或休市日）" % today)
         return 0
 
