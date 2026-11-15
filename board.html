@@ -240,7 +240,9 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 <script>
 /*
   创业红利 · 比价定投看板 — 零依赖单文件、ES5，兼容旧 Android WebView
-  规则来源：腾讯文档《比价定投使用手册 V1.0》《创业红利比价定投跟踪表 V1.1》
+  规则来源：原腾讯文档《比价定投使用手册 V1.0》《创业红利比价定投跟踪表 V1.1》
+            —— 该表格已归档，现由仓库内 history.json + signal_engine.py 承担事实源
+            （派生字段每次重算，与表格公式逐位等价，198 期零差异）
     比价 = 创业板指(399006) 收盘 ÷ 中证红利(000922) 收盘
     上轨 = 截至上月末全部历史比价的 85% 分位；下轨 = 15% 分位（前 36 个月退回 0.62/0.40）
     比价 > 上轨 → 转红利；< 下轨 → 转创业板；中间 → 持有
@@ -288,6 +290,19 @@ var DEMO = {
 var SIZES = { wide:[1280,800], square:[1000,1150], tall:[540,1275] };
 var MODES = ["wide","square","tall"];
 var mode = "wide", modeLocked = false;
+
+// 休市日集合，来自 data.json 的 holidays 字段（唯一事实源：仓库 .github/scripts/monthly_update.py）。
+// 缺失时自动退化为「只跳周末」，不会报错。月末判定与云端 cron 共用同一张表，避免两边说法不一致。
+var HOL = {};
+function ymd(dt) {
+  var m = dt.getMonth() + 1, d = dt.getDate();
+  return dt.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (d < 10 ? "0" : "") + d;
+}
+function isClosed(dt) {
+  var g = dt.getDay();
+  if (g === 0 || g === 6) { return true; }
+  return !!HOL[ymd(dt)];
+}
 
 function $(id) { return document.getElementById(id); }
 function qs(n) { var m = new RegExp("[?&]" + n + "=([^&#]*)").exec(window.location.search); return m ? decodeURIComponent(m[1]) : ""; }
@@ -370,25 +385,34 @@ function render(d) {
 
   $("sUpd").innerHTML = d.updated || "--";
   $("sSrc").innerHTML = qs("src")
-    ? (isPublicUrl(window.location.href) ? "腾讯文档 · 公网同步" : "局域网 / 本地 JSON")
+    ? (isPublicUrl(window.location.href) ? "GitHub 仓库 · 云端自动更新" : "局域网 / 本地 JSON")
     : "内置 DEMO";
+
+  HOL = {};
+  var hs = d.holidays || [];
+  for (i = 0; i < hs.length; i++) { HOL[hs[i]] = 1; }
 }
 
 function nextCheck() {
   var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  var today0 = new Date(y, m, now.getDate());
   var last = new Date(y, m + 1, 0);
-  while (last.getDay() === 0 || last.getDay() === 6) { last.setDate(last.getDate() - 1); }
-  if (last < now) { last = new Date(y, m + 2, 0); while (last.getDay() === 0 || last.getDay() === 6) { last.setDate(last.getDate() - 1); } }
-  var days = Math.ceil((last - now) / 86400000);
-  var ds = last.getFullYear() + "-" + (last.getMonth() + 1 < 10 ? "0" : "") + (last.getMonth() + 1) + "-" + (last.getDate() < 10 ? "0" : "") + last.getDate();
-  return {days: days, date: ds};
+  while (isClosed(last)) { last.setDate(last.getDate() - 1); }
+  // 只比到「日」，否则月末当天 14:00 之后会被判成「已过月末」而跳到下个月
+  if (last < today0) {
+    last = new Date(y, m + 2, 0);
+    while (isClosed(last)) { last.setDate(last.getDate() - 1); }
+  }
+  var last0 = new Date(last.getFullYear(), last.getMonth(), last.getDate());
+  return { days: Math.round((last0 - today0) / 86400000), date: ymd(last0) };
 }
 
 function tick() {
   var now = new Date(), p = function(n) { return n < 10 ? "0" + n : "" + n; };
   $("clock").innerHTML = p(now.getHours()) + ":" + p(now.getMinutes()) + ":" + p(now.getSeconds());
   var nc = nextCheck();
-  $("marketstate").innerHTML = "距月末判定 " + nc.days + " 天 · " + nc.date + "（仅跳过周末）";
+  $("marketstate").innerHTML = "距月末判定 " + (nc.days === 0 ? "今天" : nc.days + " 天")
+    + " · " + nc.date + "（已含法定节假日）";
 }
 
 function setBadge(t, live) { $("badge").innerHTML = t; $("badge").className = live ? "live" : ""; }
