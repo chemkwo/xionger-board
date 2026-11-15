@@ -18,11 +18,11 @@
     "upper": 0.62
    }
   },
-  "note": "仅存原始输入 month/cyb/hl；比价/上下轨/信号/标的/分位由 signal_engine.compute() 每次重算，避免落盘值与算法脱节",
+  "note": "仅存原始输入 month/cyb/hl；派生字段由 signal_engine.compute() 每次重算。每行必须是当月最后交易日——2026-11-02 属腾讯文档遗留的月中快照，已剔除。",
   "engine": "signal_engine.py（与腾讯文档表格公式逐位等价，198 期零差异）",
   "migrated_from": "腾讯文档《创业红利比价定投跟踪表 V1.1》file_id UFcUhFvFthcc / sheet 000001",
   "migrated_at": "2026-11-15 22:04:17",
-  "updated": "2026-11-02"
+  "updated": "2026-10-30"
  },
  "rows": [
   {
@@ -1009,11 +1009,6 @@
    "month": "2026-10-30",
    "cyb": 2413.63,
    "hl": 5592.45
-  },
-  {
-   "month": "2026-11-02",
-   "cyb": 2458.7,
-   "hl": 5587.66
   }
  ]
 }
