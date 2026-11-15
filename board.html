@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b0f14">
+<title>创业红利 · 比价定投看板</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:#080b10; }
+body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+#stage { position:absolute; left:50%; top:50%; background:#0b0f14; transform-origin:center center; display:flex; flex-direction:column; }
+.mono { font-family:Consolas,"Courier New",monospace; }
+.up { color:#f0454b; }
+.down { color:#17b26a; }
+.flat { color:#8b949e; }
+.panel { background:#131922; border:1px solid #26303d; border-radius:10px; overflow:hidden; }
+.ph { height:36px; line-height:36px; padding:0 14px; font-size:14px; font-weight:bold; color:#c9d5e1; border-bottom:1px solid #26303d; display:flex; justify-content:space-between; }
+.ph .sub { font-size:12px; font-weight:normal; color:#6e7d8d; }
+.k { font-size:12px; color:#6e7d8d; }
+
+#header { height:60px; display:flex; align-items:center; justify-content:space-between; }
+#brand { display:flex; align-items:baseline; }
+#brand .t { font-size:23px; font-weight:bold; letter-spacing:1px; }
+#brand .s { font-size:12px; color:#6e7d8d; margin-left:12px; }
+#clockbox { text-align:center; }
+#clock { font-size:26px; font-weight:bold; letter-spacing:2px; }
+#marketstate { font-size:12px; color:#e3b341; margin-top:2px; }
+#rightop { display:flex; align-items:center; }
+#badge { font-size:12px; padding:6px 12px; border:1px solid #3d4a5a; border-radius:14px; color:#8b949e; margin-right:10px; }
+#badge.live { color:#17b26a; border-color:#17b26a; }
+.btn { height:36px; font-size:13px; color:#c9d5e1; background:#1b2430; border:1px solid #3d4a5a; border-radius:8px; margin-right:8px; padding:0 12px; }
+#refresh { width:54px; padding:0; margin-right:0; }
+
+#row1 { height:176px; display:flex; margin-bottom:14px; }
+#row2 { height:176px; display:flex; margin-bottom:14px; }
+#row3 { flex:1; display:flex; margin-bottom:14px; min-height:0; }
+#decision, #quotes { width:400px; margin-right:14px; display:flex; flex-direction:column; }
+#gauge, #trend { flex:1; display:flex; flex-direction:column; }
+#timeline { flex:1.5; margin-right:14px; display:flex; flex-direction:column; }
+#sidecol { flex:1; display:flex; flex-direction:column; }
+#sidecol .panel:first-child { margin-bottom:14px; }
+
+#dbody { flex:1; padding:14px 18px; display:flex; flex-direction:column; justify-content:center; }
+#dSignal { font-size:52px; font-weight:bold; line-height:1.1; letter-spacing:2px; }
+#dTarget { font-size:18px; margin-top:6px; color:#c9d5e1; }
+#dTarget b { color:#e6edf3; }
+#dEtf { font-size:13px; color:#6e7d8d; margin-left:8px; }
+#dAction { font-size:13px; color:#8b949e; margin-top:10px; line-height:1.5; }
+.sig-hold { color:#4a9eff; }
+.sig-red { color:#f0454b; }
+.sig-green { color:#17b26a; }
+
+#gbody { flex:1; padding:12px 18px; display:flex; flex-direction:column; justify-content:center; }
+#gnums { display:flex; margin-bottom:12px; }
+.gnum { flex:1; }
+.gnum .gv { display:block; font-size:24px; font-weight:bold; margin-top:2px; }
+.gtrack { position:relative; height:34px; border-radius:6px; overflow:visible; display:flex; }
+.gzone { height:34px; line-height:34px; text-align:center; font-size:11px; color:#7d8b9b; }
+.zlow { width:25%; background:#0e3a29; border-radius:6px 0 0 6px; border-left:2px solid #17b26a; }
+.zmid { width:50%; background:#1c2733; border-top:1px solid #26303d; border-bottom:1px solid #26303d; }
+.zhigh { width:25%; background:#3a1719; border-radius:0 6px 6px 0; border-right:2px solid #f0454b; }
+.gline { position:absolute; top:0; height:34px; width:1px; background:#4a5766; }
+.gcursor { position:absolute; top:-6px; width:4px; height:46px; background:#e3b341; border-radius:2px; margin-left:-2px; }
+.gcursor:after { content:""; position:absolute; top:-5px; left:-5px; width:14px; height:14px; background:#e3b341; border-radius:50%; }
+#glabels { display:flex; justify-content:space-between; margin-top:10px; font-size:12px; color:#8b949e; }
+#glabels b { font-weight:normal; color:#c9d5e1; }
+
+#qbody { flex:1; display:flex; padding:14px; }
+.qcard { flex:1; background:#0f151d; border:1px solid #26303d; border-radius:8px; padding:12px 14px; margin-right:12px; }
+.qcard:last-child { margin-right:0; }
+.qcard .qn { font-size:13px; color:#8b949e; }
+.qcard .qc { font-size:11px; color:#6e7d8d; margin-left:6px; }
+.qcard .qv { font-size:26px; font-weight:bold; margin-top:6px; }
+.qcard .qd { font-size:12px; margin-top:4px; }
+.qcard .qe { font-size:11px; color:#6e7d8d; margin-top:6px; }
+
+#tchart { flex:1; display:flex; align-items:flex-end; padding:14px 18px 8px; }
+.tcol { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; margin-right:6px; }
+.tcol:last-child { margin-right:0; }
+.tbar { width:100%; max-width:46px; border-radius:3px 3px 0 0; min-height:3px; }
+.tbar.hold { background:#3d5a7a; }
+.tbar.red { background:#f0454b; }
+.tbar.green { background:#17b26a; }
+.tval { font-size:10px; color:#a9b7c6; margin-bottom:4px; }
+.tmon { font-size:10px; color:#6e7d8d; margin-top:6px; white-space:nowrap; }
+#tlegend { height:26px; line-height:26px; padding:0 18px; font-size:11px; color:#6e7d8d; border-top:1px solid #1c2530; }
+
+#timelist { flex:1; padding:6px 16px; overflow:hidden; }
+.trow { height:34px; display:flex; align-items:center; font-size:13px; border-bottom:1px solid #1c2530; }
+.trow:last-child { border-bottom:none; }
+.trow .tm { width:76px; color:#c9d5e1; }
+.trow .tg { width:84px; }
+.trow .tr { width:60px; color:#a9b7c6; }
+.trow .tn { flex:1; color:#6e7d8d; font-size:12px; white-space:nowrap; overflow:hidden; }
+.tag { display:inline-block; min-width:64px; padding:3px 7px; border-radius:5px; font-size:12px; text-align:center; }
+.tag.red { background:#3a1719; color:#f0454b; }
+.tag.green { background:#0e2e22; color:#17b26a; }
+.tag.hold { background:#132a3d; color:#4a9eff; }
+
+#discipline { flex:1; padding:10px 16px; font-size:12px; color:#a9b7c6; line-height:1.6; }
+#discipline b { color:#e3b341; font-weight:normal; }
+#backtest { flex:1; padding:10px 16px; }
+#bgrid { display:flex; }
+.bitem { flex:1; border-left:1px solid #26303d; padding-left:12px; }
+.bitem:first-child { border-left:none; padding-left:0; }
+.bitem .bv { font-size:20px; font-weight:bold; }
+.bitem .bk { font-size:11px; color:#6e7d8d; margin-top:2px; }
+#bnote { font-size:11px; color:#6e7d8d; margin-top:8px; line-height:1.5; }
+
+#sysbar { height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; font-size:11px; color:#6e7d8d; background:#131922; border:1px solid #26303d; border-radius:8px; }
+#sysbar b { color:#a9b7c6; font-weight:normal; }
+
+.m-wide { width:1280px; height:800px; padding:20px; }
+.m-square { width:1000px; height:1150px; padding:24px; }
+.m-tall { width:540px; height:1275px; padding:20px; }
+
+.m-square #header { height:70px; }
+.m-square #brand .t { font-size:26px; }
+.m-square #clock { font-size:30px; }
+.m-square #row1 { height:310px; flex-direction:column; }
+.m-square #row2 { height:280px; flex-direction:column; }
+.m-square #row3 { flex-direction:column; }
+.m-square #decision, .m-square #quotes { width:auto; margin-right:0; }
+.m-square #decision { height:140px; margin-bottom:14px; }
+.m-square #gauge { height:156px; }
+.m-square #quotes { height:120px; margin-bottom:14px; }
+.m-square #trend { height:146px; }
+.m-square #timeline { margin-right:0; margin-bottom:14px; height:180px; flex:none; }
+.m-square #sidecol { flex:1; flex-direction:row; }
+.m-square #sidecol .panel:first-child { margin-bottom:0; margin-right:14px; }
+.m-square #sidecol .panel { flex:1; }
+.m-square #dSignal { font-size:46px; }
+.m-square #dbody { padding:10px 18px; }
+.m-square .gnum .gv { font-size:22px; }
+.m-square #gbody { padding:8px 18px; }
+
+.m-tall #header { height:96px; flex-direction:column; justify-content:center; }
+.m-tall #brand { display:none; }
+.m-tall #clock { font-size:38px; }
+.m-tall #marketstate { font-size:13px; margin-top:5px; }
+.m-tall #rightop { position:absolute; top:16px; right:16px; }
+.m-tall #badge, .m-tall #refresh { display:none; }
+.m-tall #row1 { height:400px; flex-direction:column; }
+.m-tall #row2 { height:auto; flex:1; flex-direction:column; }
+.m-tall #row3 { display:none; }
+.m-tall #decision { width:auto; height:180px; margin-right:0; margin-bottom:14px; }
+.m-tall #gauge { height:206px; }
+.m-tall #quotes { width:auto; height:150px; margin-right:0; margin-bottom:14px; }
+.m-tall #trend { flex:1; min-height:170px; }
+.m-tall #dSignal { font-size:60px; }
+.m-tall #dTarget { font-size:20px; }
+.m-tall #dAction { font-size:14px; }
+.m-tall #qbody { flex-direction:column; padding:10px; }
+.m-tall .qcard { margin-right:0; margin-bottom:8px; padding:8px 12px; flex:1; }
+.m-tall .qcard:last-child { margin-bottom:0; }
+.m-tall .qcard .qv { font-size:22px; margin-top:2px; }
+.m-tall .qcard .qd, .m-tall .qcard .qe { display:none; }
+.m-tall #gbody { padding:8px 14px; }
+.m-tall .gnum .gv { font-size:21px; }
+.m-tall .gzone { font-size:9px; }
+.m-tall #glabels { font-size:10px; }
+.m-tall .tval, .m-tall .tmon { font-size:9px; }
+.m-tall #sysbar { height:auto; min-height:54px; flex-direction:column; align-items:flex-start; justify-content:center; line-height:1.6; padding:8px 14px; }
+</style>
+</head>
+<body>
+<div id="stage" class="m-wide">
+
+  <div id="header">
+    <div id="brand"><span class="t">创业红利 · 比价定投</span><span class="s" id="brandsub">月度判定看板</span></div>
+    <div id="clockbox"><div id="clock" class="mono">--:--:--</div><div id="marketstate">--</div></div>
+    <div id="rightop">
+      <div id="badge">演示数据</div>
+      <button class="btn" id="layoutbtn" onclick="cycleMode()">布局</button>
+      <button class="btn" id="refresh" onclick="loadData()">刷新</button>
+    </div>
+  </div>
+
+  <div id="row1">
+    <div class="panel" id="decision">
+      <div class="ph"><span>最新判定</span><span class="sub" id="dMonth">--</span></div>
+      <div id="dbody">
+        <div id="dSignal" class="sig-hold">--</div>
+        <div id="dTarget">继续定投 <b>--</b><span id="dEtf"></span></div>
+        <div id="dAction">--</div>
+      </div>
+    </div>
+    <div class="panel" id="gauge">
+      <div class="ph"><span>比价轨道</span><span class="sub">扩张分位 85% / 15%</span></div>
+      <div id="gbody">
+        <div id="gnums">
+          <div class="gnum"><span class="k">当前比价</span><span class="gv mono" id="gRatio">--</span></div>
+          <div class="gnum"><span class="k">历史分位</span><span class="gv mono" id="gPct">--</span></div>
+          <div class="gnum"><span class="k">触发状态</span><span class="gv" id="gSignal">--</span></div>
+        </div>
+        <div class="gtrack">
+          <div class="gzone zlow">转创业板区</div><div class="gzone zmid">持有区</div><div class="gzone zhigh">转红利区</div>
+          <div class="gline" style="left:25%"></div><div class="gline" style="left:75%"></div>
+          <div class="gcursor" id="gCursor" style="left:46%"></div>
+        </div>
+        <div id="glabels"><span>下轨 <b id="gLower">--</b></span><span id="gToLow">--</span><span id="gToUp">--</span><span>上轨 <b id="gUpper">--</b></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="row2">
+    <div class="panel" id="quotes">
+      <div class="ph"><span>月末录入值</span><span class="sub">指数点位口径</span></div>
+      <div id="qbody">
+        <div class="qcard"><div class="qn">创业板指<span class="qc mono">399006</span></div><div class="qv mono" id="qCyb">--</div><div class="qd" id="qCybD">--</div><div class="qe">下单 ETF <b class="mono" id="qCybE">--</b></div></div>
+        <div class="qcard"><div class="qn">中证红利<span class="qc mono">000922</span></div><div class="qv mono" id="qHl">--</div><div class="qd" id="qHlD">--</div><div class="qe">下单 ETF <b class="mono" id="qHlE">--</b></div></div>
+      </div>
+    </div>
+    <div class="panel" id="trend">
+      <div class="ph"><span>近 10 期比价</span><span class="sub">高点 0.865 → 当前</span></div>
+      <div id="tchart"></div>
+      <div id="tlegend">红 = 转红利区　绿 = 转创业板区　蓝 = 持有区</div>
+    </div>
+  </div>
+
+  <div id="row3">
+    <div class="panel" id="timeline">
+      <div class="ph"><span>历史信号 · 16 年仅 5 次</span><span class="sub">2010.06 起</span></div>
+      <div id="timelist"></div>
+    </div>
+    <div id="sidecol">
+      <div class="panel" id="discipline"></div>
+      <div class="panel" id="backtest"></div>
+    </div>
+  </div>
+
+  <div id="sysbar">
+    <span>数据源　<b id="sSrc">内置 DEMO</b>　·　更新 <b id="sUpd" class="mono">--</b>　·　刷新 <b id="sItv" class="mono">30s</b></span>
+    <span>布局 <b id="sMode">--</b>　·　常亮 <b id="sWake">待申请</b>　·　非投资建议</span>
+  </div>
+
+</div>
+
+<script>
+/*
+  创业红利 · 比价定投看板 — 零依赖单文件、ES5，兼容旧 Android WebView
+  规则来源：腾讯文档《比价定投使用手册 V1.0》《创业红利比价定投跟踪表 V1.1》
+    比价 = 创业板指(399006) 收盘 ÷ 中证红利(000922) 收盘
+    上轨 = 截至上月末全部历史比价的 85% 分位；下轨 = 15% 分位（前 36 个月退回 0.62/0.40）
+    比价 > 上轨 → 转红利；< 下轨 → 转创业板；中间 → 持有
+    每月最后一个交易日收盘后填表，次月第一个交易日下单，分 3-5 个月换仓
+
+  三档自适应：wide 1280x800 / square 1000x1150(折叠机内屏) / tall 540x1275(折叠机外屏)
+  自动按窗口宽高比切换，点「布局」可手动循环；?mode=wide|square|tall 锁定
+  参数：src=数据JSON地址，interval=轮询毫秒(默认30000)，dim=0 关闭 OLED 降亮度
+
+  data.json 字段见同目录 data.sample.json；核心为 rows 数组（与跟踪表列一一对应）：
+    month / cyb / hl / ratio / lower / upper / signal / target / pct
+  另有 history_signals、backtest、etf、monthly_amount、discipline、risk
+  未传 src 或拉取失败时回退内置演示数据（取自手册 2026-11-02 当前状态）
+*/
+
+var DEMO = {
+  updated: "2026-11-02",
+  source: "创业红利比价定投跟踪表 V1.1",
+  etf: {"创业板":"159915","中证红利":"515080"},
+  monthly_amount: 1000,
+  rows: [
+    {month:"2026-02-27",cyb:3310.30,hl:5826.71,ratio:0.568,lower:0.328,upper:0.587,signal:"持有",target:"红利",pct:76},
+    {month:"2026-03-31",cyb:3184.95,hl:5727.85,ratio:0.556,lower:0.328,upper:0.587,signal:"持有",target:"红利",pct:73},
+    {month:"2026-04-30",cyb:3677.15,hl:5865.07,ratio:0.627,lower:0.328,upper:0.587,signal:"转红利",target:"红利",pct:93},
+    {month:"2026-05-29",cyb:4037.95,hl:5578.69,ratio:0.724,lower:0.329,upper:0.589,signal:"转红利",target:"红利",pct:99},
+    {month:"2026-06-30",cyb:4342.71,hl:5022.46,ratio:0.865,lower:0.329,upper:0.591,signal:"转红利",target:"红利",pct:99},
+    {month:"2026-07-31",cyb:3343.96,hl:5569.41,ratio:0.600,lower:0.329,upper:0.592,signal:"转红利",target:"红利",pct:88},
+    {month:"2026-08-31",cyb:3438.68,hl:5718.42,ratio:0.601,lower:0.329,upper:0.592,signal:"转红利",target:"红利",pct:88},
+    {month:"2026-09-30",cyb:3135.28,hl:5493.34,ratio:0.571,lower:0.329,upper:0.593,signal:"持有",target:"红利",pct:74},
+    {month:"2026-10-30",cyb:2413.63,hl:5592.45,ratio:0.432,lower:0.329,upper:0.593,signal:"持有",target:"红利",pct:49},
+    {month:"2026-11-02",cyb:2458.70,hl:5587.66,ratio:0.440,lower:0.329,upper:0.593,signal:"持有",target:"红利",pct:50}
+  ],
+  history_signals: [
+    {month:"2013.06",ratio:0.463,signal:"转红利",note:"躲过创业板 2014 年前的低迷"},
+    {month:"2019.01",ratio:0.306,signal:"转创业板",note:"抄在 1228 点附近"},
+    {month:"2020.06",ratio:0.596,signal:"转红利",note:"躲过 2021–2023 创业板 -45%"},
+    {month:"2024.01",ratio:0.310,signal:"转创业板",note:"抄在 1573 点，两年后翻倍"},
+    {month:"2025.09",ratio:0.593,signal:"转红利",note:"躲过 2026.10 那次 -23%"}
+  ],
+  backtest: {final_wan:141.4,irr:21.19,mdd:-30.08,switches:5,invested_wan:19.8,baseline_irr:9.41},
+  discipline: "每月最后一个交易日收盘后填两个收盘价，次月首个交易日下单。每月看一次就够，16 年只动 5 次。",
+  risk: "按 9–10% 做资金规划底线；存在数年的空转期；最大回撤 -30% 并不比纯红利更低。"
+};
+
+var SIZES = { wide:[1280,800], square:[1000,1150], tall:[540,1275] };
+var MODES = ["wide","square","tall"];
+var mode = "wide", modeLocked = false;
+
+function $(id) { return document.getElementById(id); }
+function qs(n) { var m = new RegExp("[?&]" + n + "=([^&#]*)").exec(window.location.search); return m ? decodeURIComponent(m[1]) : ""; }
+function f2(v) { var n = parseFloat(v); return isNaN(n) ? "--" : n.toFixed(2); }
+function f3(v) { var n = parseFloat(v); return isNaN(n) ? "--" : n.toFixed(3); }
+function comma(v) { var n = parseFloat(v); if (isNaN(n)) { return "--"; } var s = n.toFixed(2), a = s.split("."), i = a[0], o = ""; while (i.length > 3) { o = "," + i.slice(-3) + o; i = i.slice(0, -3); } return i + o + "." + a[1]; }
+function signed(v) { var n = parseFloat(v); return (n > 0 ? "+" : "") + n.toFixed(1) + "%"; }
+function sigClass(s) { return s === "转红利" ? "red" : (s === "转创业板" ? "green" : "hold"); }
+function sigColor(s) { return s === "转红利" ? "sig-red" : (s === "转创业板" ? "sig-green" : "sig-hold"); }
+function actionText(s, amt) {
+  if (s === "转红利") { return "卖创业板，分 3–5 个月分批买入中证红利；若已满仓红利则无需动作"; }
+  if (s === "转创业板") { return "卖红利，分 3–5 个月分批买入创业板；若已满仓创业板则无需动作"; }
+  return "不动，按当前标的继续定投 " + (amt || 1000) + " 元";
+}
+
+function render(d) {
+  var rows = d.rows || [], n = rows.length, i;
+  if (!n) { return; }
+  var c = rows[n - 1], prev = n > 1 ? rows[n - 2] : null;
+  var lo = parseFloat(c.lower), hi = parseFloat(c.upper), r = parseFloat(c.ratio);
+  var pos = 25 + (r - lo) / (hi - lo) * 50;
+  if (pos < 0) { pos = 0; } if (pos > 100) { pos = 100; }
+
+  $("dMonth").innerHTML = c.month || "--";
+  $("dSignal").innerHTML = c.signal;
+  $("dSignal").className = sigColor(c.signal);
+  var tgt = c.target === "红利" ? "中证红利" : (c.target === "创业板" ? "创业板" : c.target);
+  var etf = (d.etf && d.etf[tgt]) ? d.etf[tgt] : "";
+  $("dTarget").innerHTML = "继续定投 <b>" + tgt + "</b><span id=\"dEtf\" class=\"mono\">" + (etf ? "ETF " + etf : "") + "</span>";
+  $("dAction").innerHTML = actionText(c.signal, d.monthly_amount);
+
+  $("gRatio").innerHTML = f3(r);
+  $("gPct").innerHTML = (c.pct === undefined ? "--" : c.pct + "%");
+  $("gSignal").innerHTML = c.signal;
+  $("gSignal").className = "gv " + sigColor(c.signal);
+  $("gCursor").style.left = pos + "%";
+  $("gLower").innerHTML = f3(lo);
+  $("gUpper").innerHTML = f3(hi);
+  $("gToLow").innerHTML = "距下轨 <b>" + signed((lo - r) / r * 100) + "</b>";
+  $("gToUp").innerHTML = "距上轨 <b>" + signed((hi - r) / r * 100) + "</b>";
+
+  $("qCyb").innerHTML = comma(c.cyb);
+  $("qHl").innerHTML = comma(c.hl);
+  $("qCybE").innerHTML = (d.etf && d.etf["创业板"]) || "159915";
+  $("qHlE").innerHTML = (d.etf && d.etf["中证红利"]) || "515080";
+  $("qCybD").innerHTML = prev ? "较上次 <span class=\"" + (c.cyb >= prev.cyb ? "up" : "down") + "\">" + signed((c.cyb - prev.cyb) / prev.cyb * 100) + "</span>" : "--";
+  $("qHlD").innerHTML = prev ? "较上次 <span class=\"" + (c.hl >= prev.hl ? "up" : "down") + "\">" + signed((c.hl - prev.hl) / prev.hl * 100) + "</span>" : "--";
+
+  var max = 0;
+  for (i = 0; i < n; i++) { if (parseFloat(rows[i].ratio) > max) { max = parseFloat(rows[i].ratio); } }
+  var h = "";
+  for (i = 0; i < n; i++) {
+    var x = rows[i], hp = Math.max(4, parseFloat(x.ratio) / max * 100);
+    h += '<div class="tcol"><div class="tval mono">' + f3(x.ratio) + '</div>' +
+         '<div class="tbar ' + sigClass(x.signal) + '" style="height:' + hp + '%"></div>' +
+         '<div class="tmon">' + String(x.month).slice(5) + '</div></div>';
+  }
+  $("tchart").innerHTML = h;
+
+  h = "";
+  var hs = d.history_signals || [];
+  for (i = 0; i < hs.length; i++) {
+    var s = hs[i];
+    h += '<div class="trow"><span class="tm mono">' + s.month + '</span>' +
+         '<span class="tg"><span class="tag ' + sigClass(s.signal) + '">' + s.signal + '</span></span>' +
+         '<span class="tr mono">' + f3(s.ratio) + '</span>' +
+         '<span class="tn">' + (s.note || "") + '</span></div>';
+  }
+  $("timelist").innerHTML = h;
+
+  var bt = d.backtest || {};
+  $("discipline").innerHTML = '<b>操作纪律</b>　' + (d.discipline || "") + '<br><b>风险底线</b>　' + (d.risk || "");
+  h = '<div id="bgrid">' +
+      '<div class="bitem"><div class="bv mono">' + (bt.final_wan || "--") + ' 万</div><div class="bk">回测终值</div></div>' +
+      '<div class="bitem"><div class="bv mono up">' + (bt.irr || "--") + '%</div><div class="bk">年化 IRR</div></div>' +
+      '<div class="bitem"><div class="bv mono down">' + (bt.mdd || "--") + '%</div><div class="bk">最大回撤</div></div>' +
+      '<div class="bitem"><div class="bv mono">' + (bt.switches || "--") + ' 次</div><div class="bk">16 年切换</div></div></div>' +
+      '<div id="bnote">累计投入 ' + (bt.invested_wan || "--") + ' 万；IRR 为资金加权，不是每年赚 ' + (bt.irr || "--") + '%。<b style="color:#e3b341;font-weight:normal">资金规划按 ' + (bt.baseline_irr || "9.41") + '% 做底线</b>，别把回测当承诺。</div>';
+  $("backtest").innerHTML = h;
+
+  $("sUpd").innerHTML = d.updated || "--";
+  $("sSrc").innerHTML = qs("src")
+    ? (isPublicUrl(window.location.href) ? "腾讯文档 · 公网同步" : "局域网 / 本地 JSON")
+    : "内置 DEMO";
+}
+
+function nextCheck() {
+  var now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  var last = new Date(y, m + 1, 0);
+  while (last.getDay() === 0 || last.getDay() === 6) { last.setDate(last.getDate() - 1); }
+  if (last < now) { last = new Date(y, m + 2, 0); while (last.getDay() === 0 || last.getDay() === 6) { last.setDate(last.getDate() - 1); } }
+  var days = Math.ceil((last - now) / 86400000);
+  var ds = last.getFullYear() + "-" + (last.getMonth() + 1 < 10 ? "0" : "") + (last.getMonth() + 1) + "-" + (last.getDate() < 10 ? "0" : "") + last.getDate();
+  return {days: days, date: ds};
+}
+
+function tick() {
+  var now = new Date(), p = function(n) { return n < 10 ? "0" + n : "" + n; };
+  $("clock").innerHTML = p(now.getHours()) + ":" + p(now.getMinutes()) + ":" + p(now.getSeconds());
+  var nc = nextCheck();
+  $("marketstate").innerHTML = "距月末判定 " + nc.days + " 天 · " + nc.date + "（仅跳过周末）";
+}
+
+function setBadge(t, live) { $("badge").innerHTML = t; $("badge").className = live ? "live" : ""; }
+
+function loadData() {
+  var url = qs("src");
+  if (!url) { render(DEMO); setBadge("演示数据", false); return; }
+  var xhr = new XMLHttpRequest();
+  xhr.timeout = 5000;
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState === 4) {
+      if (xhr.status === 200 || xhr.status === 0) {
+        try { render(JSON.parse(xhr.responseText)); setBadge("已连接 · 表格数据", true); }
+        catch (e) { render(DEMO); setBadge("数据格式错误 · 演示", false); }
+      } else { render(DEMO); setBadge("离线 · 演示", false); }
+    }
+  };
+  xhr.ontimeout = function() { render(DEMO); setBadge("超时 · 演示", false); };
+  xhr.onerror = function() { render(DEMO); setBadge("离线 · 演示", false); };
+  // 绝对 http(s) URL，或「页面本身在 http(s) 上 + src 是相对路径」都要打破缓存；
+  // file:// 下绝不能带 ?_=，Android WebView 会把它当文件名的一部分。
+  var pageHttp = /^https?:/i.test(window.location.href);
+  var needBust = /^https?:/i.test(url) || (pageHttp && !/^file:/i.test(url));
+  var cacheBust = needBust ? ((url.indexOf("?") < 0 ? "?_=" : "&_=") + new Date().getTime()) : "";
+  try { xhr.open("GET", url + cacheBust, true); xhr.send(null); }
+  catch (e) { render(DEMO); setBadge("离线 · 演示", false); }
+}
+
+function autoMode() { var r = window.innerWidth / window.innerHeight; return r >= 1.30 ? "wide" : (r >= 0.68 ? "square" : "tall"); }
+function setMode(m, lock) {
+  if (!SIZES[m]) { m = "wide"; }
+  mode = m; if (lock) { modeLocked = true; }
+  var st = $("stage");
+  st.className = "m-" + m;
+  st.style.width = SIZES[m][0] + "px";
+  st.style.height = SIZES[m][1] + "px";
+  st.style.filter = (qs("dim") === "0" || m === "wide") ? "none" : "brightness(0.88)";
+  $("brandsub").innerHTML = m === "wide" ? "月度判定看板" : (m === "square" ? "折叠机 · 内屏展开" : "折叠机 · 外屏速览");
+  $("sMode").innerHTML = m;
+  fit();
+}
+function cycleMode() {
+  var i = 0, j;
+  for (j = 0; j < MODES.length; j++) { if (MODES[j] === mode) { i = j; } }
+  setMode(MODES[(i + 1) % MODES.length], true);
+}
+function fit() {
+  var s = Math.min(window.innerWidth / SIZES[mode][0], window.innerHeight / SIZES[mode][1]);
+  $("stage").style.transform = "translate(-50%,-50%) scale(" + s + ")";
+}
+function tryWakeLock() {
+  var el = $("sWake");
+  try {
+    if (navigator.wakeLock && navigator.wakeLock.request) {
+      navigator.wakeLock.request("screen").then(function() { el.innerHTML = "已启用"; })["catch"](function() { el.innerHTML = "需系统设置"; });
+    } else { el.innerHTML = "需系统设置"; }
+  } catch (e) { el.innerHTML = "需系统设置"; }
+}
+
+function isPublicUrl(u) {
+  if (!/^https?:/i.test(u)) { return false; }
+  var m = /^https?:\/\/([^\/:]+)/i.exec(u);
+  if (!m) { return false; }
+  var h = m[1].toLowerCase();
+  if (h === "localhost" || h === "127.0.0.1") { return false; }
+  if (/^192\.168\./.test(h) || /^10\./.test(h)) { return false; }
+  if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(h)) { return false; }
+  return true;
+}
+// 公网判定必须看「页面自身」：GitHub Pages 上通常填 ?src=data.json（相对路径），
+// 只判断 src 会误判成局域网，导致 30s 轮询、一个月烧掉约 345MB 手机流量。
+var itv = parseInt(qs("interval"), 10);
+if (isNaN(itv) || itv < 5000) {
+  itv = (isPublicUrl(window.location.href) || isPublicUrl(qs("src"))) ? 3600000 : 30000;
+}
+$("sItv").innerHTML = itv >= 3600000 ? (Math.round(itv / 3600000) + "h") : (Math.round(itv / 1000) + "s");
+var pm = qs("mode");
+setMode(SIZES[pm] ? pm : autoMode(), !!SIZES[pm]);
+tick(); loadData(); tryWakeLock();
+setInterval(tick, 1000); setInterval(loadData, itv);
+window.onresize = function() { if (!modeLocked) { setMode(autoMode(), false); } else { fit(); } };
+try { document.addEventListener("visibilitychange", function() { if (!document.hidden) { tryWakeLock(); } }); } catch (e) {}
+</script>
+</body>
+</html>
