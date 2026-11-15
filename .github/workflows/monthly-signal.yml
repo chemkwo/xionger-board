@@ -1,0 +1,53 @@
+name: monthly-signal
+
+# 月末自动判定创业红利比价定投信号。
+# UTC 07:30 = 北京时间 15:30。每月 28–31 日触发，脚本自己判断当天是否本月最后一个工作日，
+# 不是就 SKIP 退出，不会产生空 commit。也可在 Actions 页面手动 Run workflow 补跑任意日期。
+
+on:
+  schedule:
+    - cron: "30 7 28-31 * *"
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "指定日期 YYYY-MM-DD（留空 = 自动判断本月最后工作日）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: monthly-signal
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 计算并更新信号
+        working-directory: .github/scripts
+        env:
+          INPUT_DATE: ${{ inputs.date }}
+        run: python monthly_update.py
+
+      - name: 有变化才提交
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add history.json data.json
+          if git diff --staged --quiet; then
+            echo "无变化，跳过提交"
+          else
+            git commit -m "data: 月度信号更新 $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push
+          fi
