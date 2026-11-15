@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>创业红利 · 比价定投看板</title>
+<script>
+(function () {
+  var q = window.location.search || "";
+  if (q.indexOf("src=") < 0) {
+    q = (q ? q + "&" : "?") + "src=data.json";
+  }
+  window.location.replace("board.html" + q);
+})();
+</script>
+</head>
+<body style="background:#0e1117;color:#e6edf3;font:16px/1.6 system-ui,sans-serif;padding:24px">
+正在打开看板… 若没有自动跳转，请点
+<a style="color:#58a6ff" href="board.html?src=data.json">这里</a>。
+</body>
+</html>
