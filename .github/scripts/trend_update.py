@@ -6,9 +6,10 @@
 **不碰 history.json / data.json 的月度录入行** —— 月末数据仍由
 monthly_update.py 独占写入，这里只加一条并行的走势数据链。
 
-为什么单独一个文件：
-  周线 844 点、日线 1250 点，比月度 197 期大一个量级。塞进 data.json 会让
-  看板每次轮询（公网手机端 1h 一次）都多拉几十 KB，而这两张图只有第 3 页用得上。
+为什么单独一个文件，而且只留十几个点：
+  看板第 3 页只画最近 15 个交易日和最近 15 个周末收盘。历史上那 4000 多个点
+  既不显示、又要跟着每次轮询下载，纯属浪费手机流量。所以这里拉全量、算完就砍，
+  只把尾巴 15+15 个点写出去（约 1KB，原来全量是 31KB）。
 
 数据格式（紧凑，省流量）：
   weekly / daily 都是 [[YYYYMMDD, 比价 ×1000 取整], ...]
@@ -38,7 +39,10 @@ SOURCES = (("cyb", "sz399006", "创业板指"), ("hl", "sh000922", "中证红利
 
 WEEK_BARS = 2000   # 接口上限 2000；周线全历史只有 844 根
 DAY_BARS = 2000    # 接口上限，约 8 年
-DAY_KEEP = 1250    # 日线只留最近 1250 根（约 5 年），图上再长就看不清了
+# 看板只画最近十几个点：日线取最近 15 个交易日，周线取最近 15 个周末收盘。
+# 只往下发这么多，trend.json 从 31KB 瘦到 1KB 左右——手机端没必要为看不见的
+# 4000 个历史点付流量。
+KEEP = 15
 
 # 比价合理区间：低于 0.05 或高于 50 基本可以断定两个标的抓错了
 RATIO_RANGE = (0.05, 50.0)
@@ -124,21 +128,21 @@ def main(argv=None):
         bars = fetch(code, "week", WEEK_BARS)
         wk[key] = bars
         log("周线 %-8s %s → %s  %d 根" % (name, bars[0][0], bars[-1][0], len(bars)))
-    weekly = merge(wk["cyb"], wk["hl"])
+    weekly = merge(wk["cyb"], wk["hl"])[-KEEP:]
 
     dy = {}
     for key, code, name in SOURCES:
         bars = fetch(code, "day", DAY_BARS)
         dy[key] = bars
         log("日线 %-8s %s → %s  %d 根" % (name, bars[0][0], bars[-1][0], len(bars)))
-    daily = merge(dy["cyb"], dy["hl"])[-DAY_KEEP:]
+    daily = merge(dy["cyb"], dy["hl"])[-KEEP:]
 
-    # 点数下限：少于这些基本是接口给了残缺数据，宁可不写也不要用半截数据覆盖
-    if len(weekly) < 700:
-        log("ERROR 周线只有 %d 点，少于 700，拒绝写入" % len(weekly))
+    # 点数下限：少于 KEEP 说明接口给了残缺数据，宁可不写也不要用半截数据覆盖
+    if len(weekly) < KEEP:
+        log("ERROR 周线只有 %d 点，少于 %d，拒绝写入" % (len(weekly), KEEP))
         return 1
-    if len(daily) < 400:
-        log("ERROR 日线只有 %d 点，少于 400，拒绝写入" % len(daily))
+    if len(daily) < KEEP:
+        log("ERROR 日线只有 %d 点，少于 %d，拒绝写入" % (len(daily), KEEP))
         return 1
 
     log("周线比价 %s　最新 %.3f" % (fmt(weekly), weekly[-1][1] / 1000.0))
@@ -146,7 +150,7 @@ def main(argv=None):
 
     data = {
         "updated": str(daily[-1][0]),
-        "note": "比价 = 创业板指 ÷ 中证红利，×1000 取整；weekly 全历史，daily 近 5 年",
+        "note": "比价 = 创业板指 ÷ 中证红利，×1000 取整；各取最近 %d 个点" % KEEP,
         "source": "腾讯财经 前复权 K 线",
         "weekly": weekly,
         "daily": daily,
