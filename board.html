@@ -601,19 +601,29 @@ function drawTrendChart(boxId, pts, opt) {
   for (i = 0; i < n; i++) {
     var x = X(i).toFixed(1), yy = Y(pts[i][1]);
     var up = i > 0 && pts[i][1] >= pts[i - 1][1];
-    var col = i === 0 ? "#a9b7c6" : (up ? "#f0454b" : "#17b26a");
-    s += '<circle cx="' + x + '" cy="' + yy.toFixed(1) + '" r="2.2" fill="' + col + '"/>';
+    // 末点统一用黄色：既是「当前位置」的标记，也避免再加一个圈压住数字
+    var isLast = (i === n - 1);
+    var col = isLast ? "#e3b341" : (i === 0 ? "#a9b7c6" : (up ? "#f0454b" : "#17b26a"));
+    s += '<circle cx="' + x + '" cy="' + yy.toFixed(1) + '" r="' + (isLast ? 3.4 : 2.2)
+      + '" fill="' + col + '"/>';
     s += '<text x="' + x + '" y="' + (yy - 8).toFixed(1)
       + '" fill="' + col + '" font-size="9" text-anchor="middle">'
       + (pts[i][1] / 1000).toFixed(3) + '</text>';
-    if (i % 2 === 0 || i === n - 1) {
+    if (i % 2 === 0 || isLast) {
       s += '<text x="' + x + '" y="' + (H - 7)
         + '" fill="#5d6b7a" font-size="8" text-anchor="middle">' + mmdd(pts[i][0]) + '</text>';
     }
   }
-  // 末点用实心黄点：空心圈会和上一个数字的底线打架
-  s += '<circle cx="' + X(n - 1).toFixed(1) + '" cy="' + Y(pts[n - 1][1]).toFixed(1)
-    + '" r="3.4" fill="#e3b341"/>';
+
+  // 右上角标当前上下轨数值。只给数值不画线——15 天里轨道离得远（0.33 / 0.59），
+  // 画进纵轴会把曲线压成一条窄带。取最后一个已入库月末，即当前生效的轨道。
+  var ser = LAST.series || [], last = ser.length ? ser[ser.length - 1] : null;
+  if (last) {
+    s += '<text x="' + (W - PR) + '" y="14" font-size="9" text-anchor="end">'
+      + '<tspan fill="#6e7d8d">下轨 </tspan><tspan fill="#4fae86">' + (+last[2]).toFixed(3) + '</tspan>'
+      + '<tspan fill="#6e7d8d">　上轨 </tspan><tspan fill="#e07a7e">' + (+last[3]).toFixed(3) + '</tspan>'
+      + '</text>';
+  }
   s += '</svg>';
   box.innerHTML = s;
 
@@ -622,14 +632,11 @@ function drawTrendChart(boxId, pts, opt) {
   var lp = pts[n - 1][1];
   var txt = (lp / 1000).toFixed(3)
     + "　·　" + n + " " + opt.unit + " " + signed((lp - pts[0][1]) / pts[0][1] * 100);
-  if (opt.dist) {
-    var ser = LAST.series || [], last = ser.length ? ser[ser.length - 1] : null;
-    if (last) {
-      var lw = +last[2] * 1000;
-      // 只报距下轨：上轨那边总览页有月度口径的，这里再塞一个会把标题挤出省略号。
-      // 用绝对值，正负号在这个语境下容易被读反。
-      txt += "　·　距下轨 " + Math.abs((lp - lw) / lp * 100).toFixed(1) + "%";
-    }
+  if (opt.dist && last) {
+    // 只报距下轨：上轨那边总览页有月度口径的，这里再塞一个会把标题挤成省略号。
+    // 用绝对值，正负号在这个语境下容易被读反。
+    var lw = +last[2] * 1000;
+    txt += "　·　距下轨 " + Math.abs((lp - lw) / lp * 100).toFixed(1) + "%";
   }
   sub.innerHTML = txt;
 }
