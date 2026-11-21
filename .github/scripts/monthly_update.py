@@ -211,6 +211,25 @@ def validate(prices, prev):
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
+def write_data(data, path):
+    """data.json 落盘。顶层缩进便于人工核对，series 单独压成单行。
+
+    series 有 197 行，若跟着 indent 展开会多出十几 KB 纯空白；
+    手机每天要拉好几次，没必要为可读性付这个流量。
+    """
+    series = data.pop("series", None)
+    text = json.dumps(data, ensure_ascii=False, indent=2)
+    if series is not None:
+        data["series"] = series
+        compact = json.dumps(series, ensure_ascii=False, separators=(",", ":"))
+        text = text.rstrip()
+        assert text.endswith("}")
+        text = text[:-1].rstrip() + ',\n  "series": ' + compact + "\n}"
+        text += "\n"
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
 def write_outputs(hist, rows, stamp):
     """把 rows 落盘：history.json 存原始输入，data.json 存最近 RECENT 期派生结果。"""
     computed = se.compute(rows)
@@ -234,9 +253,12 @@ def write_outputs(hist, rows, stamp):
     data["source"] = SOURCE_LABEL
     # 交易日历一并下发给看板，让「距月末判定」用的休市表只有这一个事实源
     data["holidays"] = sorted(HOLIDAYS)
-    with open(DATA, "w", encoding="utf-8", newline="\n") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    log("已写 history.json（%d 期）与 data.json（最近 %d 期）" % (len(rows), len(recent)))
+    # 全序列下发（给看板画 16 年走势与分位通道）。
+    # 只带绘制必需的四个数，197 期约 7KB；不要下发 cyb/hl 原文，那会把体积翻倍。
+    data["series"] = [[c["month"], c["ratio"], c["lower"], c["upper"]] for c in computed]
+    write_data(data, DATA)
+    log("已写 history.json（%d 期）与 data.json（最近 %d 期 + 全序列 %d 点）"
+        % (len(rows), len(recent), len(data["series"])))
     return cur
 
 
