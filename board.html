@@ -33,8 +33,7 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 .btn { height:36px; font-size:13px; color:#c9d5e1; background:#1b2430; border:1px solid #3d4a5a; border-radius:8px; padding:0 12px; }
 
 #row1 { height:416px; display:flex; flex-direction:column; margin-bottom:14px; }
-#row2 { flex:1; display:flex; flex-direction:column; margin-bottom:14px; min-height:0; }
-#row3 { display:none; }
+#row2 { flex:1; display:flex; flex-direction:column; min-height:0; }
 
 #decision { width:auto; height:196px; margin-bottom:14px; display:flex; flex-direction:column; }
 #quotes { width:auto; height:194px; margin-bottom:14px; display:flex; flex-direction:column; }
@@ -86,8 +85,6 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 #tlegend { height:26px; line-height:26px; padding:0 18px; font-size:11px; color:#6e7d8d; border-top:1px solid #1c2530; }
 
 /* 第 3 行（时间线 / 纪律 / 回测）在竖屏版式下不显示，样式保留以便将来启用 */
-#timeline { flex:1.5; display:flex; flex-direction:column; }
-#sidecol { flex:1; display:flex; flex-direction:column; }
 #timelist { flex:1; padding:6px 16px; overflow:hidden; }
 .trow { height:34px; display:flex; align-items:center; font-size:13px; border-bottom:1px solid #1c2530; }
 .trow:last-child { border-bottom:none; }
@@ -99,9 +96,9 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 .tag.red { background:#3a1719; color:#f0454b; }
 .tag.green { background:#0e2e22; color:#17b26a; }
 .tag.hold { background:#132a3d; color:#4a9eff; }
-#discipline { flex:1; padding:10px 16px; font-size:12px; color:#a9b7c6; line-height:1.6; }
+#discipline { padding:10px 16px; font-size:12px; color:#a9b7c6; line-height:1.65; }
 #discipline b { color:#e3b341; font-weight:normal; }
-#backtest { flex:1; padding:10px 16px; }
+#backtest { padding:10px 16px; }
 #bgrid { display:flex; }
 .bitem { flex:1; border-left:1px solid #26303d; padding-left:12px; }
 .bitem:first-child { border-left:none; padding-left:0; }
@@ -113,76 +110,133 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
           padding:8px 14px; font-size:11px; color:#6e7d8d; background:#131922; border:1px solid #26303d; border-radius:8px;
           display:flex; }
 #sysbar b { color:#a9b7c6; font-weight:normal; }
+
+/* ---------- 分页 ---------- */
+#tabs { height:44px; display:flex; align-items:center; }
+#tabs .tab { flex:1; height:34px; line-height:32px; text-align:center; font-size:13px; color:#6e7d8d;
+             background:#131922; border:1px solid #26303d; border-radius:8px; margin-right:8px; }
+#tabs .tab:last-child { margin-right:0; }
+#tabs .tab.on { color:#e6edf3; background:#1b2430; border-color:#3d4a5a; font-weight:bold; }
+
+#pager { flex:1; position:relative; overflow:hidden; min-height:0; }
+.page { position:absolute; left:0; top:0; width:100%; height:100%;
+        display:flex; flex-direction:column; transition:transform .24s ease; }
+
+/* 页 2：16 年走势（高度给足，SVG 按容器实测尺寸画，不写死） */
+#longchart { height:570px; margin-bottom:12px; display:flex; flex-direction:column; }
+#lchart { flex:1; min-height:0; }
+#lchart svg { display:block; }
+#lempty { padding:20px 16px; font-size:12px; color:#6e7d8d; line-height:1.6; }
+#timeline { flex:1; min-height:0; display:flex; flex-direction:column; }
+#timelist { flex:1; }
+
+/* 页 3：规则 —— 四块按权重分，内容不足也不会在单块里开大洞 */
+#p2 .panel { flex:1; margin-bottom:12px; display:flex; flex-direction:column; }
+#p2 .panel:last-child { margin-bottom:0; }
+#p2 #spec { flex:1.12; }
+#discipline, #backtest { flex:1; }
+#specbody, #srcbody { flex:1; padding:6px 16px; overflow:hidden; }
+.srow { display:flex; height:27px; align-items:center; font-size:12px; border-bottom:1px solid #1c2530; }
+.srow:last-child { border-bottom:none; }
+.srow .sk { width:84px; color:#6e7d8d; flex:none; }
+.srow .sv { flex:1; color:#c9d5e1; }
+#badge { cursor:pointer; }
 </style>
 </head>
 <body>
 <div id="stage">
 
   <div id="header">
-    <div id="brand"><span class="t">创业红利 · 比价定投</span><span class="s" id="brandsub">月度判定看板</span></div>
     <div id="clockbox"><div id="clock" class="mono">--:--:--</div><div id="marketstate">--</div></div>
-    <div id="rightop">
-      <div id="badge">演示数据</div>
-      <button class="btn" id="refresh" onclick="loadData()">刷新</button>
-    </div>
   </div>
 
-  <div id="row1">
-    <div class="panel" id="decision">
-      <div class="ph"><span>最新判定</span><span class="sub" id="dMonth">--</span></div>
-      <div id="dbody">
-        <div id="dSignal" class="sig-hold">--</div>
-        <div id="dTarget">继续定投 <b>--</b><span id="dEtf"></span></div>
-        <div id="dAction">--</div>
-      </div>
-    </div>
-    <div class="panel" id="gauge">
-      <div class="ph"><span>比价轨道</span><span class="sub">扩张分位 85% / 15%</span></div>
-      <div id="gbody">
-        <div id="gnums">
-          <div class="gnum"><span class="k">当前比价</span><span class="gv mono" id="gRatio">--</span></div>
-          <div class="gnum"><span class="k">历史分位</span><span class="gv mono" id="gPct">--</span></div>
-          <div class="gnum"><span class="k">触发状态</span><span class="gv" id="gSignal">--</span></div>
+  <div id="tabs">
+    <span class="tab on" onclick="goPage(0)">总览</span>
+    <span class="tab" onclick="goPage(1)">历史</span>
+    <span class="tab" onclick="goPage(2)">规则</span>
+  </div>
+
+  <div id="pager">
+
+    <div class="page" id="p0">
+      <div id="row1">
+        <div class="panel" id="decision">
+          <div class="ph"><span>最新判定</span><span class="sub" id="dMonth">--</span></div>
+          <div id="dbody">
+            <div id="dSignal" class="sig-hold">--</div>
+            <div id="dTarget">继续定投 <b>--</b><span id="dEtf"></span></div>
+            <div id="dAction">--</div>
+          </div>
         </div>
-        <div class="gtrack">
-          <div class="gzone zlow">转创业板区</div><div class="gzone zmid">持有区</div><div class="gzone zhigh">转红利区</div>
-          <div class="gline" style="left:25%"></div><div class="gline" style="left:75%"></div>
-          <div class="gcursor" id="gCursor" style="left:46%"></div>
+        <div class="panel" id="gauge">
+          <div class="ph"><span>比价轨道</span><span class="sub">扩张分位 85% / 15%</span></div>
+          <div id="gbody">
+            <div id="gnums">
+              <div class="gnum"><span class="k">当前比价</span><span class="gv mono" id="gRatio">--</span></div>
+              <div class="gnum"><span class="k">历史分位</span><span class="gv mono" id="gPct">--</span></div>
+              <div class="gnum"><span class="k">触发状态</span><span class="gv" id="gSignal">--</span></div>
+            </div>
+            <div class="gtrack">
+              <div class="gzone zlow">转创业板区</div><div class="gzone zmid">持有区</div><div class="gzone zhigh">转红利区</div>
+              <div class="gline" style="left:25%"></div><div class="gline" style="left:75%"></div>
+              <div class="gcursor" id="gCursor" style="left:46%"></div>
+            </div>
+            <div id="glabels"><span>下轨 <b id="gLower">--</b></span><span id="gToLow">--</span><span id="gToUp">--</span><span>上轨 <b id="gUpper">--</b></span></div>
+          </div>
         </div>
-        <div id="glabels"><span>下轨 <b id="gLower">--</b></span><span id="gToLow">--</span><span id="gToUp">--</span><span>上轨 <b id="gUpper">--</b></span></div>
+      </div>
+
+      <div id="row2">
+        <div class="panel" id="quotes">
+          <div class="ph"><span>月末录入值</span><span class="sub">指数点位口径</span></div>
+          <div id="qbody">
+            <div class="qcard"><div class="qn">创业板指<span class="qc mono">399006</span></div><div class="qv mono" id="qCyb">--</div><div class="qd" id="qCybD">--</div><div class="qe">下单 ETF <b class="mono" id="qCybE">--</b></div></div>
+            <div class="qcard"><div class="qn">中证红利<span class="qc mono">000922</span></div><div class="qv mono" id="qHl">--</div><div class="qd" id="qHlD">--</div><div class="qe">下单 ETF <b class="mono" id="qHlE">--</b></div></div>
+          </div>
+        </div>
+        <div class="panel" id="trend">
+          <div class="ph"><span>近 10 期比价</span><span class="sub" id="tsub">高点 -- → 当前 --</span></div>
+          <div id="tchart"></div>
+          <div id="tlegend">红 = 转红利区　绿 = 转创业板区　蓝 = 持有区</div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <div id="row2">
-    <div class="panel" id="quotes">
-      <div class="ph"><span>月末录入值</span><span class="sub">指数点位口径</span></div>
-      <div id="qbody">
-        <div class="qcard"><div class="qn">创业板指<span class="qc mono">399006</span></div><div class="qv mono" id="qCyb">--</div><div class="qd" id="qCybD">--</div><div class="qe">下单 ETF <b class="mono" id="qCybE">--</b></div></div>
-        <div class="qcard"><div class="qn">中证红利<span class="qc mono">000922</span></div><div class="qv mono" id="qHl">--</div><div class="qd" id="qHlD">--</div><div class="qe">下单 ETF <b class="mono" id="qHlE">--</b></div></div>
+    <div class="page" id="p1">
+      <div class="panel" id="longchart">
+        <div class="ph"><span>16 年比价走势</span><span class="sub" id="lsub">阴影 = 15%–85% 分位通道</span></div>
+        <div id="lchart"></div>
+      </div>
+      <div class="panel" id="timeline">
+        <div class="ph"><span>历史信号 · 16 年仅 5 次</span><span class="sub">2010.06 起</span></div>
+        <div id="timelist"></div>
       </div>
     </div>
-    <div class="panel" id="trend">
-      <div class="ph"><span>近 10 期比价</span><span class="sub">高点 0.865 → 当前</span></div>
-      <div id="tchart"></div>
-      <div id="tlegend">红 = 转红利区　绿 = 转创业板区　蓝 = 持有区</div>
-    </div>
-  </div>
 
-  <div id="row3">
-    <div class="panel" id="timeline">
-      <div class="ph"><span>历史信号 · 16 年仅 5 次</span><span class="sub">2010.06 起</span></div>
-      <div id="timelist"></div>
+    <div class="page" id="p2">
+      <div class="panel" id="discwrap">
+        <div class="ph"><span>操作纪律 · 风险底线</span><span class="sub">每月看一次</span></div>
+        <div id="discipline"></div>
+      </div>
+      <div class="panel" id="btwrap">
+        <div class="ph"><span>回测表现</span><span class="sub">2010.06 起 · 非承诺</span></div>
+        <div id="backtest"></div>
+      </div>
+      <div class="panel" id="spec">
+        <div class="ph"><span>口径与参数</span><span class="sub" id="specSrc">--</span></div>
+        <div id="specbody"></div>
+      </div>
+      <div class="panel" id="srccard">
+        <div class="ph"><span>数据与更新</span><span class="sub" id="srcSub">--</span></div>
+        <div id="srcbody"></div>
+      </div>
     </div>
-    <div id="sidecol">
-      <div class="panel" id="discipline"></div>
-      <div class="panel" id="backtest"></div>
-    </div>
+
   </div>
 
   <div id="sysbar">
-    <span>数据源　<b id="sSrc">内置 DEMO</b>　·　更新 <b id="sUpd" class="mono">--</b>　·　刷新 <b id="sItv" class="mono">30s</b></span>
-    <span>常亮 <b id="sWake">待申请</b>　·　非投资建议</span>
+    <span><b id="badge" onclick="loadData()">演示数据</b>　·　数据源 <b id="sSrc">内置 DEMO</b>　·　更新 <b id="sUpd" class="mono">--</b></span>
+    <span>刷新 <b id="sItv" class="mono">30s</b>　·　常亮 <b id="sWake">待申请</b>　·　非投资建议</span>
   </div>
 
 </div>
@@ -208,11 +262,12 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
   data.json 字段见同目录 data.sample.json；核心为 rows 数组（与跟踪表列一一对应）：
     month / cyb / hl / ratio / lower / upper / signal / target / pct
   另有 history_signals、backtest、etf、monthly_amount、discipline、risk
-  未传 src 或拉取失败时回退内置演示数据（取自手册 2026-11-02 当前状态）
+  以及 series（全历史比价，供第 2 页长图）与 holidays（休市日历）
+  未传 src 或拉取失败时回退内置演示数据（取自 2026-10-30 当前状态）
 */
 
 var DEMO = {
-  updated: "2026-11-02",
+  updated: "2026-10-30",
   source: "创业红利比价定投跟踪表 V1.1",
   etf: {"创业板":"159915","中证红利":"515080"},
   monthly_amount: 1000,
@@ -225,8 +280,7 @@ var DEMO = {
     {month:"2026-07-31",cyb:3343.96,hl:5569.41,ratio:0.600,lower:0.329,upper:0.592,signal:"转红利",target:"红利",pct:88},
     {month:"2026-08-31",cyb:3438.68,hl:5718.42,ratio:0.601,lower:0.329,upper:0.592,signal:"转红利",target:"红利",pct:88},
     {month:"2026-09-30",cyb:3135.28,hl:5493.34,ratio:0.571,lower:0.329,upper:0.593,signal:"持有",target:"红利",pct:74},
-    {month:"2026-10-30",cyb:2413.63,hl:5592.45,ratio:0.432,lower:0.329,upper:0.593,signal:"持有",target:"红利",pct:49},
-    {month:"2026-11-02",cyb:2458.70,hl:5587.66,ratio:0.440,lower:0.329,upper:0.593,signal:"持有",target:"红利",pct:50}
+    {month:"2026-10-30",cyb:2413.63,hl:5592.45,ratio:0.432,lower:0.329,upper:0.593,signal:"持有",target:"红利",pct:49}
   ],
   history_signals: [
     {month:"2013.06",ratio:0.463,signal:"转红利",note:"躲过创业板 2014 年前的低迷"},
@@ -248,9 +302,10 @@ var DEMO = {
 // 所以同比例的不同 dpr 机器（1080x2344 @2.75 或 @3.0）都自动吻合。
 var STAGE_W = 500;
 // 版式压不下去的极限高度，实测自 CSS：
-//   内边距 40 + header 96 + row1(decision 196 + 间距 14 + gauge 206) + 间距 14
-//   + row2 最小(quotes 194 + 间距 14 + trend 170) + 间距 14 + 状态栏 54 = 1012
-var STAGE_MIN_H = 1012;
+//   内边距 40 + header 96 + 标签栏 44
+//   + 页内最小(decision 196 + 14 + gauge 206) + 14 + (quotes 194 + 14 + trend 170)
+//   + 状态栏 54 = 1042
+var STAGE_MIN_H = 1042;
 
 function layout() {
   var iw = window.innerWidth, ih = window.innerHeight;
@@ -263,6 +318,157 @@ function layout() {
   var s = Math.min(iw / STAGE_W, ih / h);
   st.style.transform = "translate(-50%,-50%) scale(" + s + ")";
 }
+
+// ---- 分页 ---------------------------------------------------------------
+var PAGE = 0, PAGEN = 3;
+
+function goPage(n) {
+  if (n < 0) { n = 0; }
+  if (n > PAGEN - 1) { n = PAGEN - 1; }
+  PAGE = n;
+  var ps = $("pager").getElementsByClassName("page"), i;
+  for (i = 0; i < ps.length; i++) {
+    ps[i].style.transform = "translateX(" + ((i - n) * 100) + "%)";
+  }
+  var ts = $("tabs").getElementsByClassName("tab");
+  for (i = 0; i < ts.length; i++) {
+    ts[i].className = "tab" + (i === n ? " on" : "");
+  }
+}
+
+function bindPager() {
+  var pg = $("pager"), tx = 0, ty = 0, on = false;
+  pg.addEventListener("touchstart", function (e) {
+    var t = e.touches[0]; tx = t.clientX; ty = t.clientY; on = true;
+  }, false);
+  pg.addEventListener("touchmove", function (e) {
+    if (!on) { return; }
+    var t = e.touches[0];
+    // 判为横向滑动就吃掉默认行为，避免同时触发页面纵向滚动
+    if (Math.abs(t.clientX - tx) > Math.abs(t.clientY - ty) * 1.5) { e.preventDefault(); }
+  }, false);
+  pg.addEventListener("touchend", function (e) {
+    if (!on) { return; }
+    on = false;
+    var t = e.changedTouches[0], dx = t.clientX - tx, dy = t.clientY - ty;
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      goPage(PAGE + (dx < 0 ? 1 : -1));
+    }
+  }, false);
+}
+
+// ---- 16 年比价走势（内联 SVG，零依赖） ----------------------------------
+// series 每项 [月份, 比价, 下轨, 上轨]；阴影带 = 当时的 15%–85% 分位通道。
+function drawLongChart(series, signals) {
+  var box = $("lchart");
+  if (!box) { return; }
+  if (!series || series.length < 2) {
+    box.innerHTML = '<div id="lempty">长序列未下发（data.json 缺 series 字段）。<br>'
+      + '在仓库 .github/scripts 下跑 <b>python monthly_update.py --rebuild</b> 补齐。</div>';
+    return;
+  }
+  // 按容器实测尺寸画：画布高度随屏幕比例变，写死像素会在高屏上留大片空白
+  var W = box.clientWidth || 458, H = box.clientHeight || 534;
+  if (W < 240 || H < 160) { W = 458; H = 534; }
+  var PL = 34, PR = 8, PT = 10, PB = 20;
+  var n = series.length, i, j, k;
+  var vlo = 1e9, vhi = -1e9;
+  for (i = 0; i < n; i++) {
+    var rr = +series[i][1], lw = +series[i][2], up = +series[i][3];
+    if (lw < vlo) { vlo = lw; }
+    if (up > vhi) { vhi = up; }
+    if (rr < vlo) { vlo = rr; }
+    if (rr > vhi) { vhi = rr; }
+  }
+  vlo = Math.floor(vlo * 10) / 10;
+  vhi = Math.ceil(vhi * 10) / 10;
+  if (vhi - vlo < 0.2) { vhi = vlo + 0.2; }
+  var iw = W - PL - PR, ih = H - PT - PB;
+  function X(idx) { return PL + iw * idx / (n - 1); }
+  function Y(v) { return PT + ih - (v - vlo) / (vhi - vlo) * ih; }
+  function d1(v) { return v.toFixed(1); }
+
+  var upPts = "", loPts = "", linePts = "";
+  for (i = 0; i < n; i++) {
+    var x = d1(X(i));
+    upPts += x + "," + d1(Y(series[i][3])) + " ";
+    loPts = x + "," + d1(Y(series[i][2])) + " " + loPts;
+    linePts += x + "," + d1(Y(series[i][1])) + " ";
+  }
+
+  var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">';
+  var gv, gy;
+  for (k = 0; k <= 4; k++) {
+    gv = vlo + (vhi - vlo) * k / 4;
+    gy = d1(Y(gv));
+    s += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '" stroke="#1c2530"/>'
+      + '<text x="' + (PL - 6) + '" y="' + (Y(gv) + 3.5).toFixed(1) + '" fill="#5d6b7a" font-size="9" text-anchor="end">'
+      + gv.toFixed(2) + '</text>';
+  }
+  // 前 36 期样本不足，轨道用固定回退值 0.62/0.40；画条竖虚线，免得那块矩形
+  // 被当成渲染错误。36 期之后才是真正的 15%/85% 分位。
+  if (n > 36) {
+    s += '<line x1="' + d1(X(36)) + '" y1="' + PT + '" x2="' + d1(X(36)) + '" y2="' + (H - PB)
+      + '" stroke="#3a4a5c" stroke-width="1" stroke-dasharray="3 3"/>';
+  }
+  s += '<polygon points="' + upPts + loPts + '" fill="#1c2733"/>';
+  s += '<polyline points="' + upPts + '" fill="none" stroke="#3a4a5c" stroke-width="1"/>';
+  s += '<polyline points="' + loPts + '" fill="none" stroke="#3a4a5c" stroke-width="1"/>';
+  s += '<polyline points="' + linePts + '" fill="none" stroke="#4a9eff" stroke-width="1.6"/>';
+
+  var step = Math.max(1, Math.ceil(n / 6));
+  for (i = 0; i < n; i += step) {
+    s += '<text x="' + d1(X(i)) + '" y="' + (H - 6) + '" fill="#5d6b7a" font-size="9" text-anchor="middle">'
+      + String(series[i][0]).slice(2, 4) + '</text>';
+  }
+  if (signals) {
+    for (j = 0; j < signals.length; j++) {
+      var tag = String(signals[j].month).replace(".", "-");
+      for (i = 0; i < n; i++) {
+        if (String(series[i][0]).slice(0, 7) === tag) {
+          s += '<circle cx="' + d1(X(i)) + '" cy="' + d1(Y(series[i][1])) + '" r="2.6" fill="'
+            + (signals[j].signal === "转红利" ? "#f0454b" : "#17b26a") + '"/>';
+          break;
+        }
+      }
+    }
+  }
+  s += '</svg>';
+  box.innerHTML = s;
+  if ($("lsub")) { $("lsub").innerHTML = n + " 期　·　虚线左为回退轨道　·　红/绿 = 切换"; }
+}
+
+// ---- 口径与参数 / 数据与更新 --------------------------------------------
+function fillSpec(d) {
+  var body = $("specbody");
+  if (!body) { return; }
+  var etf = d.etf || {};
+  function row(k, v) {
+    return '<div class="srow"><span class="sk">' + k + '</span><span class="sv">' + v + '</span></div>';
+  }
+  body.innerHTML =
+      row("比价口径", "创业板指 399006 ÷ 中证红利 000922")
+    + row("下单 ETF", (etf["创业板"] || "159915") + " 创业板　" + (etf["中证红利"] || "515080") + " 红利")
+    + row("每期金额", (d.monthly_amount || 1000) + " 元")
+    + row("轨道分位", "上轨 85%　下轨 15%　样本不足 36 期回退 0.62 / 0.40")
+    + row("执行节奏", "月末收盘判定 → 次月首个交易日下单 → 分 3–5 个月换仓")
+    + row("事实源", "history.json（" + ((d.series && d.series.length) || 197) + " 期原始输入，派生值每次重算）");
+  if ($("specSrc")) { $("specSrc").innerHTML = d.updated || "--"; }
+
+  var sb = $("srcbody");
+  if (!sb) { return; }
+  var rows = d.rows || [];
+  var span = rows.length ? (String(rows[0].month).slice(0, 7) + " – " + String(rows[rows.length - 1].month).slice(0, 7)) : "--";
+  var hol = (d.holidays || []).length;
+  sb.innerHTML =
+      row("更新日期", d.updated || "--")
+    + row("云端判定", "每日北京 15:30 抓腾讯财经前复权日线")
+    + row("入库闸门", "只有当月最后交易日才会写入")
+    + row("休市日历", hol ? ("2026–2027 共 " + hol + " 天（含调休）") : "未下发")
+    + row("历史跨度", span + "　共 " + ((d.series && d.series.length) || 0) + " 期");
+  if ($("srcSub")) { $("srcSub").innerHTML = isPublicUrl(window.location.href) ? "GitHub Pages" : "本地"; }
+}
+
 
 
 // 休市日集合，来自 data.json 的 holidays 字段（唯一事实源：仓库 .github/scripts/monthly_update.py）。
@@ -291,6 +497,8 @@ function actionText(s, amt) {
   if (s === "转创业板") { return "卖红利，分 3–5 个月分批买入创业板；若已满仓创业板则无需动作"; }
   return "不动，按当前标的继续定投 " + (amt || 1000) + " 元";
 }
+
+var LAST = null;   // 最近一次渲染用的数据，供窗口尺寸变化后重画 SVG
 
 function render(d) {
   var rows = d.rows || [], n = rows.length, i;
@@ -327,6 +535,7 @@ function render(d) {
 
   var max = 0;
   for (i = 0; i < n; i++) { if (parseFloat(rows[i].ratio) > max) { max = parseFloat(rows[i].ratio); } }
+  if ($("tsub")) { $("tsub").innerHTML = "高点 " + f3(max) + " → 当前 " + f3(r); }
   var h = "";
   for (i = 0; i < n; i++) {
     var x = rows[i], hp = Math.max(4, parseFloat(x.ratio) / max * 100);
@@ -363,8 +572,12 @@ function render(d) {
     : "内置 DEMO";
 
   HOL = {};
-  var hs = d.holidays || [];
-  for (i = 0; i < hs.length; i++) { HOL[hs[i]] = 1; }
+  var hd = d.holidays || [];
+  for (i = 0; i < hd.length; i++) { HOL[hd[i]] = 1; }
+
+  LAST = d;
+  drawLongChart(d.series, d.history_signals);
+  fillSpec(d);
 }
 
 function nextCheck() {
@@ -446,10 +659,16 @@ if (isNaN(itv) || itv < 5000) {
 $("sItv").innerHTML = itv >= 3600000 ? (Math.round(itv / 3600000) + "h") : (Math.round(itv / 1000) + "s");
 setTheme();
 layout();
+goPage(0);
+bindPager();
 tick(); loadData(); tryWakeLock();
 setInterval(tick, 1000); setInterval(loadData, itv);
 // 竖屏画布高度依赖 innerHeight，所以锁定时也必须重算尺寸，不能只 fit()。
-window.onresize = function() { layout(); };
+// 长图是按容器实测尺寸画的，尺寸变了要重画，否则 SVG 会跟容器对不上。
+window.onresize = function() {
+  layout();
+  if (LAST) { drawLongChart(LAST.series, LAST.history_signals); }
+};
 try { document.addEventListener("visibilitychange", function() { if (!document.hidden) { tryWakeLock(); } }); } catch (e) {}
 </script>
 </body>
