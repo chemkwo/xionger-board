@@ -113,7 +113,7 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 
 .m-wide { width:1280px; height:800px; padding:20px; }
 .m-square { width:1000px; height:1150px; padding:24px; }
-.m-tall { width:540px; height:1275px; padding:20px; }
+.m-tall { width:500px; height:1085px; padding:20px; }
 
 .m-square #header { height:70px; }
 .m-square #brand .t { font-size:26px; }
@@ -141,12 +141,14 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 .m-tall #marketstate { font-size:13px; margin-top:5px; }
 .m-tall #rightop { position:absolute; top:16px; right:16px; }
 .m-tall #badge, .m-tall #refresh { display:none; }
-.m-tall #row1 { height:400px; flex-direction:column; }
+.m-tall #row1 { height:416px; flex-direction:column; }
 .m-tall #row2 { height:auto; flex:1; flex-direction:column; }
 .m-tall #row3 { display:none; }
-.m-tall #decision { width:auto; height:180px; margin-right:0; margin-bottom:14px; }
+/* 高度按内容自然高实测设定：decision 195 / quotes 192。
+   原来写的 180 / 150 会把「中证红利」那一格的数值裁掉（面板 overflow:hidden）。 */
+.m-tall #decision { width:auto; height:196px; margin-right:0; margin-bottom:14px; }
 .m-tall #gauge { height:206px; }
-.m-tall #quotes { width:auto; height:150px; margin-right:0; margin-bottom:14px; }
+.m-tall #quotes { width:auto; height:194px; margin-right:0; margin-bottom:14px; }
 .m-tall #trend { flex:1; min-height:170px; }
 .m-tall #dSignal { font-size:60px; }
 .m-tall #dTarget { font-size:20px; }
@@ -248,9 +250,12 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
     比价 > 上轨 → 转红利；< 下轨 → 转创业板；中间 → 持有
     每月最后一个交易日收盘后填表，次月第一个交易日下单，分 3-5 个月换仓
 
-  三档自适应：wide 1280x800 / square 1000x1150(折叠机内屏) / tall 540x1275(折叠机外屏)
+  三档自适应：wide 1280x800 / square 1000x1150(折叠机内屏) / tall 竖屏手机
+  tall 的宽度固定、高度按屏幕比例实时算，所以画布正好铺满屏幕、不留黑边，
+  也不用为每台手机的物理分辨率写死一档（1080x2344、1170x2532 都吃同一套）。
   自动按窗口宽高比切换，点「布局」可手动循环；?mode=wide|square|tall 锁定
   参数：src=数据JSON地址，interval=轮询毫秒(默认30000)，dim=0 关闭 OLED 降亮度
+        w=tall 画布宽度（默认 500，调大则整体变小）
 
   data.json 字段见同目录 data.sample.json；核心为 rows 数组（与跟踪表列一一对应）：
     month / cyb / hl / ratio / lower / upper / signal / target / pct
@@ -287,8 +292,32 @@ var DEMO = {
   risk: "按 9–10% 做资金规划底线；存在数年的空转期；最大回撤 -30% 并不比纯红利更低。"
 };
 
-var SIZES = { wide:[1280,800], square:[1000,1150], tall:[540,1275] };
+var SIZES = { wide:[1280,800], square:[1000,1150], tall:[500,1085] };
 var MODES = ["wide","square","tall"];
+
+// 竖屏画布：宽度固定，高度 = 宽度 ÷ 屏幕宽高比，因此 fit() 的缩放系数在两个方向上相等，
+// 画布正好铺满、上下左右都不留黑边。
+// 物理分辨率无关：innerWidth/innerHeight 是 CSS 像素，比值与 devicePixelRatio 无关，
+// 1080x2344 / 1170x2532 / 1440x3200 都走同一套计算，不必逐台适配。
+// TALL_MIN：布局压不下去的极限高度，实测自 tall 版 CSS：
+//   内边距 40 + header 96 + row1(decision 196 + 间距 14 + gauge 206) + 间距 14
+//   + row2 最小(quotes 194 + 间距 14 + trend 170) + 间距 14 + 状态栏 54 = 1012
+// 屏幕比这更矮时自动加宽画布，保证内容不被压爆。
+var TALL_MIN = 1012;
+
+function stageSize(m) {
+  var s = SIZES[m] || SIZES.wide;
+  if (m !== "tall") { return [s[0], s[1]]; }
+  var iw = window.innerWidth, ih = window.innerHeight;
+  if (!(iw > 0) || !(ih > 0)) { return [s[0], s[1]]; }
+  var r = iw / ih;
+  // ?w= 可手动覆盖宽度：调小 → 文字变大（可能趋紧），调大 → 更宽松
+  var w = parseFloat(qs("w"));
+  if (!(w > 100)) { w = s[0]; }
+  var need = Math.ceil(TALL_MIN * r);   // 保证高度不低于布局下限
+  if (w < need) { w = need; }
+  return [w, Math.round(w / r)];
+}
 var mode = "wide", modeLocked = false;
 
 // 休市日集合，来自 data.json 的 holidays 字段（唯一事实源：仓库 .github/scripts/monthly_update.py）。
@@ -445,12 +474,12 @@ function autoMode() { var r = window.innerWidth / window.innerHeight; return r >
 function setMode(m, lock) {
   if (!SIZES[m]) { m = "wide"; }
   mode = m; if (lock) { modeLocked = true; }
-  var st = $("stage");
+  var st = $("stage"), sz = stageSize(m);
   st.className = "m-" + m;
-  st.style.width = SIZES[m][0] + "px";
-  st.style.height = SIZES[m][1] + "px";
+  st.style.width = sz[0] + "px";
+  st.style.height = sz[1] + "px";
   st.style.filter = (qs("dim") === "0" || m === "wide") ? "none" : "brightness(0.88)";
-  $("brandsub").innerHTML = m === "wide" ? "月度判定看板" : (m === "square" ? "折叠机 · 内屏展开" : "折叠机 · 外屏速览");
+  $("brandsub").innerHTML = m === "wide" ? "月度判定看板" : (m === "square" ? "折叠机 · 内屏展开" : "竖屏 · 速览");
   $("sMode").innerHTML = m;
   fit();
 }
@@ -460,7 +489,8 @@ function cycleMode() {
   setMode(MODES[(i + 1) % MODES.length], true);
 }
 function fit() {
-  var s = Math.min(window.innerWidth / SIZES[mode][0], window.innerHeight / SIZES[mode][1]);
+  var sz = stageSize(mode);
+  var s = Math.min(window.innerWidth / sz[0], window.innerHeight / sz[1]);
   $("stage").style.transform = "translate(-50%,-50%) scale(" + s + ")";
 }
 function tryWakeLock() {
@@ -493,7 +523,8 @@ var pm = qs("mode");
 setMode(SIZES[pm] ? pm : autoMode(), !!SIZES[pm]);
 tick(); loadData(); tryWakeLock();
 setInterval(tick, 1000); setInterval(loadData, itv);
-window.onresize = function() { if (!modeLocked) { setMode(autoMode(), false); } else { fit(); } };
+// 竖屏画布高度依赖 innerHeight，所以锁定时也必须重算尺寸，不能只 fit()。
+window.onresize = function() { setMode(modeLocked ? mode : autoMode(), modeLocked); };
 try { document.addEventListener("visibilitychange", function() { if (!document.hidden) { tryWakeLock(); } }); } catch (e) {}
 </script>
 </body>
