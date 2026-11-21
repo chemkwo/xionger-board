@@ -131,9 +131,9 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 #timeline { flex:1; min-height:0; display:flex; flex-direction:column; }
 #timelist { flex:1; }
 
-/* 页 3：日 / 周走势（同一张图的两种粒度，轨道都是月末口径的阶梯） */
-#wchart { height:392px; margin-bottom:12px; display:flex; flex-direction:column; }
-#dchart { height:392px; display:flex; flex-direction:column; }
+/* 页 3：日 / 周短期比价（各 15 个点，每点标数值） */
+#dchart { height:396px; margin-bottom:12px; display:flex; flex-direction:column; }
+#wchart { height:396px; display:flex; flex-direction:column; }
 #wbody, #ddbody { flex:1; min-height:0; }
 #wbody svg, #ddbody svg { display:block; }
 .tempty { padding:20px 16px; font-size:12px; color:#6e7d8d; line-height:1.7; }
@@ -223,13 +223,13 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
     </div>
 
     <div class="page" id="p2">
-      <div class="panel" id="wchart">
-        <div class="ph"><span>周线比价 · 2010.06 起</span><span class="sub" id="wsub">--</span></div>
-        <div id="wbody"></div>
-      </div>
       <div class="panel" id="dchart">
-        <div class="ph"><span>日线比价 · 近 5 年</span><span class="sub" id="ddsub">--</span></div>
+        <div class="ph"><span>日线 · 最近 15 个交易日</span><span class="sub" id="ddsub">--</span></div>
         <div id="ddbody"></div>
+      </div>
+      <div class="panel" id="wchart">
+        <div class="ph"><span>周线 · 最近 15 周</span><span class="sub" id="wsub">--</span></div>
+        <div id="wbody"></div>
       </div>
     </div>
 
@@ -537,22 +537,26 @@ function loadTrend() {
 }
 
 function paintTrend() {
-  if (!LAST || !TREND) { return; }   // 月度数据先到，轨道要用它
+  if (!LAST || !TREND) { return; }   // 月度数据先到（副标题要算距轨道）
   if (TREND.err) {
-    var msg = '<div class="tempty">走势数据没拉下来（' + TREND.err + '）。<br>'
+    var msg = '<div class="tempty">短期走势没拉下来（' + TREND.err + '）。<br>'
       + '在仓库 <b>.github/scripts</b> 下跑 <b>python trend_update.py</b> 生成 trend.json。</div>';
     if ($("wbody")) { $("wbody").innerHTML = msg; }
     if ($("ddbody")) { $("ddbody").innerHTML = msg; }
     return;
   }
-  drawTrendChart("wbody", TREND.weekly, { fill: false, dots: true, sub: "wsub", unit: "周", years: 9 });
-  drawTrendChart("ddbody", TREND.daily, { fill: true, dots: false, sub: "ddsub", unit: "日", years: 7 });
+  drawTrendChart("ddbody", TREND.daily, { sub: "ddsub", unit: "日", dist: true });
+  drawTrendChart("wbody", TREND.weekly, { sub: "wsub", unit: "周", dist: false });
 }
 
-function fmtN(v) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function mmdd(v) {
+  var s = String(v % 10000);
+  while (s.length < 4) { s = "0" + s; }
+  return s.slice(0, 2) + "-" + s.slice(2);
+}
 
-// pts 形如 [[20261120, 400], ...]（比价 ×1000）；
-// 轨道 tk 来自 LAST.series，是「月末才跳一次」的阶梯，映射到每个点上。
+// pts 形如 [[20261120, 400], ...]（比价 ×1000），只画最近这十几个点。
+// 每点标数值、涨红跌绿；日期隔一个标一次，15 个全标会糊成一片。
 function drawTrendChart(boxId, pts, opt) {
   var box = $(boxId);
   if (!box) { return; }
@@ -560,136 +564,76 @@ function drawTrendChart(boxId, pts, opt) {
     box.innerHTML = '<div class="tempty">没有下发' + opt.unit + '线数据。</div>';
     return;
   }
-  var W = box.clientWidth || 458, H = box.clientHeight || 352;
-  if (W < 240 || H < 120) { W = 458; H = 352; }
-  var PL = 34, PR = 8, PT = 10, PB = 20;
-  var n = pts.length, i, j, k;
+  var W = box.clientWidth || 458, H = box.clientHeight || 360;
+  if (W < 240 || H < 140) { W = 458; H = 360; }
+  var PL = 34, PR = 14, PT = 24, PB = 26;
+  var n = pts.length, i, k;
 
-  // 轨道：把月末的 15%/85% 分位按日期铺到每个点上（×1000 统一单位）
-  var tk = [], ser = LAST.series || [];
-  for (i = 0; i < ser.length; i++) {
-    tk.push([parseInt(String(ser[i][0]).replace(/-/g, ""), 10),
-             Math.round(+ser[i][2] * 1000), Math.round(+ser[i][3] * 1000)]);
-  }
-  var los = [], his = [], lo = null, hi = null, ti = 0;
-  for (i = 0; i < n; i++) {
-    while (ti < tk.length && tk[ti][0] <= pts[i][0]) { lo = tk[ti][1]; hi = tk[ti][2]; ti++; }
-    los.push(lo);
-    his.push(hi);
-  }
-  // 序列可能比轨道更早（周线 2010.06 起，第一个月末在 6/30），开头这几周没有轨道
-  var k0 = 0;
-  while (k0 < n && los[k0] === null) { k0++; }
-
+  // y 轴只按比价本身定范围。上下轨（0.33 / 0.59）离得远，掺进来会把曲线
+  // 压成一条窄带；轨道距离改用副标题的百分比表达，更精确也不占图面。
   var vlo = 1e9, vhi = -1e9;
   for (i = 0; i < n; i++) {
     if (pts[i][1] < vlo) { vlo = pts[i][1]; }
     if (pts[i][1] > vhi) { vhi = pts[i][1]; }
-    if (los[i] !== null && los[i] < vlo) { vlo = los[i]; }
-    if (his[i] !== null && his[i] > vhi) { vhi = his[i]; }
   }
-  vlo = Math.floor(vlo / 20) * 20;
-  vhi = Math.ceil(vhi / 20) * 20;
-  if (vhi - vlo < 40) { vhi = vlo + 40; }
+  var pad = Math.max(8, Math.round((vhi - vlo) * 0.22));
+  vlo -= pad;
+  vhi += pad;
 
   var iw = W - PL - PR, ih = H - PT - PB;
   function X(idx) { return PL + iw * idx / (n - 1); }
   function Y(v) { return PT + ih - (v - vlo) / (vhi - vlo) * ih; }
 
-  // 点太密就抽稀：1250 个点画在 418px 上，每像素 3 个点纯属浪费字符串
-  var step = Math.max(1, Math.floor(n / (iw * 1.6)));
-  var idx = [];
-  for (i = 0; i < n - 1; i += step) { idx.push(i); }
-  idx.push(n - 1);
-
-  var linePts = "", upPts = "", loPts = "";
-  for (j = 0; j < idx.length; j++) {
-    i = idx[j];
-    var xx = X(i).toFixed(1);
-    linePts += xx + "," + Y(pts[i][1]).toFixed(1) + " ";
-    if (i >= k0) {
-      upPts += xx + "," + Y(his[i]).toFixed(1) + " ";
-      loPts = xx + "," + Y(los[i]).toFixed(1) + " " + loPts;
-    }
-  }
-
   var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">';
-  for (k = 0; k <= 4; k++) {
-    var gv = vlo + (vhi - vlo) * k / 4, gy = Y(gv).toFixed(1);
+  for (k = 0; k <= 2; k++) {
+    var gv = vlo + (vhi - vlo) * k / 2, gy = Y(gv).toFixed(1);
     s += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '" stroke="#1c2530"/>'
       + '<text x="' + (PL - 6) + '" y="' + (Y(gv) + 3.5).toFixed(1)
-      + '" fill="#5d6b7a" font-size="9" text-anchor="end">' + (gv / 1000).toFixed(2) + '</text>';
+      + '" fill="#5d6b7a" font-size="9" text-anchor="end">' + (gv / 1000).toFixed(3) + '</text>';
   }
-  // 前 36 个月末样本不足，轨道是回退值 0.62/0.40，在图上就是一段矩形+垂直跳变。
-  // 跟月度图一样画条竖虚线，免得被当成渲染错误。日线图起点晚于 2013，不会用到。
-  if (tk.length > 36) {
-    var sp = tk[36][0];
-    if (sp > pts[0][0] && sp < pts[n - 1][0]) {
-      for (i = 0; i < n; i++) { if (pts[i][0] >= sp) { break; } }
-      var sx = X(i).toFixed(1);
-      s += '<line x1="' + sx + '" y1="' + PT + '" x2="' + sx + '" y2="' + (H - PB)
-        + '" stroke="#3a4a5c" stroke-width="1" stroke-dasharray="3 3"/>';
-    }
-  }
-  if (opt.fill && upPts) {
-    s += '<polygon points="' + upPts + loPts + '" fill="#1c2733"/>';
-  }
-  if (upPts) {
-    s += '<polyline points="' + upPts + '" fill="none" stroke="#3a4a5c" stroke-width="1"/>';
-    s += '<polyline points="' + loPts + '" fill="none" stroke="#3a4a5c" stroke-width="1"/>';
-  }
-  s += '<polyline points="' + linePts + '" fill="none" stroke="#4a9eff" stroke-width="'
-    + (opt.fill ? 1.2 : 1.4) + '"/>';
 
-  // 年份刻度
-  var marks = [], lastY = -1;
+  var linePts = "";
   for (i = 0; i < n; i++) {
-    var y = Math.floor(pts[i][0] / 10000);
-    if (y !== lastY) { marks.push([i, y]); lastY = y; }
+    linePts += X(i).toFixed(1) + "," + Y(pts[i][1]).toFixed(1) + " ";
   }
-  var ystep = Math.ceil(marks.length / (opt.years || 8));
-  for (j = 0; j < marks.length; j += ystep) {
-    s += '<text x="' + X(marks[j][0]).toFixed(1) + '" y="' + (H - 6)
-      + '" fill="#5d6b7a" font-size="9" text-anchor="middle">'
-      + String(marks[j][1]).slice(2) + '</text>';
-  }
+  s += '<polyline points="' + linePts + '" fill="none" stroke="#4a9eff" stroke-width="1.6"/>';
 
-  // 历史切换点（只有周线图标，月度 197 期那 5 次）
-  if (opt.dots) {
-    var sigs = LAST.history_signals || [];
-    for (j = 0; j < sigs.length; j++) {
-      var tag = parseInt(String(sigs[j].month).replace(".", ""), 10);   // 2013.06 → 201306
-      for (i = 0; i < n; i++) {
-        if (Math.floor(pts[i][0] / 100) >= tag) {
-          s += '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(pts[i][1]).toFixed(1)
-            + '" r="2.6" fill="' + (sigs[j].signal === "转红利" ? "#f0454b" : "#17b26a") + '"/>';
-          break;
-        }
-      }
+  for (i = 0; i < n; i++) {
+    var x = X(i).toFixed(1), yy = Y(pts[i][1]);
+    var up = i > 0 && pts[i][1] >= pts[i - 1][1];
+    var col = i === 0 ? "#a9b7c6" : (up ? "#f0454b" : "#17b26a");
+    s += '<circle cx="' + x + '" cy="' + yy.toFixed(1) + '" r="2.2" fill="' + col + '"/>';
+    s += '<text x="' + x + '" y="' + (yy - 8).toFixed(1)
+      + '" fill="' + col + '" font-size="9" text-anchor="middle">'
+      + (pts[i][1] / 1000).toFixed(3) + '</text>';
+    if (i % 2 === 0 || i === n - 1) {
+      s += '<text x="' + x + '" y="' + (H - 7)
+        + '" fill="#5d6b7a" font-size="8" text-anchor="middle">' + mmdd(pts[i][0]) + '</text>';
     }
   }
-  // 末点高亮：一眼能看出当前比价落在哪
+  // 末点用实心黄点：空心圈会和上一个数字的底线打架
   s += '<circle cx="' + X(n - 1).toFixed(1) + '" cy="' + Y(pts[n - 1][1]).toFixed(1)
-    + '" r="3" fill="#e3b341"/>';
+    + '" r="3.4" fill="#e3b341"/>';
   s += '</svg>';
   box.innerHTML = s;
 
-  var sub = $("wsub");
-  if (opt.sub === "ddsub") { sub = $("ddsub"); }
-  if (sub) {
-    var lp = pts[n - 1][1], loN = los[n - 1], hiN = his[n - 1];
-    var txt = fmtN(n) + " " + opt.unit;
-    if (opt.sub === "ddsub") {
-      // 日线这张才有「离轨道多远」的意义——周线只想知道现在什么位置。
-      // 用绝对值：正负号在这个语境下反而容易被读反。
-      if (loN !== null) { txt += "　·　距下轨 " + Math.abs((lp - loN) / lp * 100).toFixed(1) + "%"; }
-      if (hiN !== null) { txt += "　距上轨 " + Math.abs((hiN - lp) / lp * 100).toFixed(1) + "%"; }
-    } else {
-      txt += "　·　最新 " + (lp / 1000).toFixed(3);
+  var sub = $(opt.sub);
+  if (!sub) { return; }
+  var lp = pts[n - 1][1];
+  var txt = (lp / 1000).toFixed(3)
+    + "　·　" + n + " " + opt.unit + " " + signed((lp - pts[0][1]) / pts[0][1] * 100);
+  if (opt.dist) {
+    var ser = LAST.series || [], last = ser.length ? ser[ser.length - 1] : null;
+    if (last) {
+      var lw = +last[2] * 1000;
+      // 只报距下轨：上轨那边总览页有月度口径的，这里再塞一个会把标题挤出省略号。
+      // 用绝对值，正负号在这个语境下容易被读反。
+      txt += "　·　距下轨 " + Math.abs((lp - lw) / lp * 100).toFixed(1) + "%";
     }
-    sub.innerHTML = txt;
   }
+  sub.innerHTML = txt;
 }
+
 
 
 // 休市日集合，来自 data.json 的 holidays 字段（唯一事实源：仓库 .github/scripts/monthly_update.py）。
