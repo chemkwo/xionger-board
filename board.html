@@ -15,8 +15,9 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 .flat { color:#8b949e; }
 .panel { background:#131922; border:1px solid #26303d; border-radius:10px; overflow:hidden; }
 .ph { height:36px; line-height:36px; padding:0 14px; font-size:14px; font-weight:bold; color:#c9d5e1; border-bottom:1px solid #26303d; display:flex; justify-content:space-between; }
-.ph .sub { font-size:12px; font-weight:normal; color:#6e7d8d; }
-.k { font-size:12px; color:#6e7d8d; }
+.ph .sub { font-size:12px; font-weight:normal; color:#6e7d8d;
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-left:10px; }
+.ph > span:first-child { flex:0 0 auto; }.k { font-size:12px; color:#6e7d8d; }
 
 /* 画布：只有一种竖屏版式（为 1080x2344 这台机器设计，CSS 逻辑宽 500）。
    实际宽高由 JS 按屏幕比例写入，这里的 500x1085 是兜底值。 */
@@ -130,10 +131,17 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
 #timeline { flex:1; min-height:0; display:flex; flex-direction:column; }
 #timelist { flex:1; }
 
-/* 页 3：规则 —— 四块按权重分，内容不足也不会在单块里开大洞 */
-#p2 .panel { flex:1; margin-bottom:12px; display:flex; flex-direction:column; }
-#p2 .panel:last-child { margin-bottom:0; }
-#p2 #spec { flex:1.12; }
+/* 页 3：日 / 周走势（同一张图的两种粒度，轨道都是月末口径的阶梯） */
+#wchart { height:392px; margin-bottom:12px; display:flex; flex-direction:column; }
+#dchart { height:392px; display:flex; flex-direction:column; }
+#wbody, #ddbody { flex:1; min-height:0; }
+#wbody svg, #ddbody svg { display:block; }
+.tempty { padding:20px 16px; font-size:12px; color:#6e7d8d; line-height:1.7; }
+
+/* 页 4：规则 —— 四块按权重分，内容不足也不会在单块里开大洞 */
+#p3 .panel { flex:1; margin-bottom:12px; display:flex; flex-direction:column; }
+#p3 .panel:last-child { margin-bottom:0; }
+#p3 #spec { flex:1.12; }
 #discipline, #backtest { flex:1; }
 #specbody, #srcbody { flex:1; padding:6px 16px; overflow:hidden; }
 .srow { display:flex; height:27px; align-items:center; font-size:12px; border-bottom:1px solid #1c2530; }
@@ -153,7 +161,8 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
   <div id="tabs">
     <span class="tab on" onclick="goPage(0)">总览</span>
     <span class="tab" onclick="goPage(1)">历史</span>
-    <span class="tab" onclick="goPage(2)">规则</span>
+    <span class="tab" onclick="goPage(2)">日周</span>
+    <span class="tab" onclick="goPage(3)">规则</span>
   </div>
 
   <div id="pager">
@@ -214,6 +223,17 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
     </div>
 
     <div class="page" id="p2">
+      <div class="panel" id="wchart">
+        <div class="ph"><span>周线比价 · 2010.06 起</span><span class="sub" id="wsub">--</span></div>
+        <div id="wbody"></div>
+      </div>
+      <div class="panel" id="dchart">
+        <div class="ph"><span>日线比价 · 近 5 年</span><span class="sub" id="ddsub">--</span></div>
+        <div id="ddbody"></div>
+      </div>
+    </div>
+
+    <div class="page" id="p3">
       <div class="panel" id="discwrap">
         <div class="ph"><span>操作纪律 · 风险底线</span><span class="sub">每月看一次</span></div>
         <div id="discipline"></div>
@@ -257,7 +277,15 @@ body { font-family:"Microsoft YaHei","PingFang SC",sans-serif; color:#e6edf3; -w
     innerWidth/innerHeight 是 CSS 像素，比值与 devicePixelRatio 无关，
     所以同比例的不同 dpr（@2.75、@3.0）自动吻合，不用逐台适配。
   换机器要重新对数时，只需改 STAGE_W / CSS 里各段的固定高度，再跑 check_layout.py 体检。
-  参数：src=数据JSON地址，interval=轮询毫秒(默认30000)，dim=0 关闭 OLED 降亮度
+  分页：总览(0) / 历史(1) / 日周(2) / 规则(3)，点标签或左右滑切换。
+    页内元素都必须在 #pager 里 absolute 定位横排，加页只需多放一个 .page 并改 PAGEN。
+  参数：src=数据JSON地址，trend=走势JSON地址（默认与 src 同目录的 trend.json），
+        interval=轮询毫秒(默认30000)，dim=0 关闭 OLED 降亮度
+
+  数据分两条链，互不覆盖：
+    data.json  月度真值（history.json 197 期），由 monthly_update.py 独占写入
+    trend.json 日/周比价走势（周线 844 点 / 日线近 5 年），由 trend_update.py 生成；
+               只用来画图，不参与任何信号判定，缺了只是那页显示提示。
 
   data.json 字段见同目录 data.sample.json；核心为 rows 数组（与跟踪表列一一对应）：
     month / cyb / hl / ratio / lower / upper / signal / target / pct
@@ -320,7 +348,7 @@ function layout() {
 }
 
 // ---- 分页 ---------------------------------------------------------------
-var PAGE = 0, PAGEN = 3;
+var PAGE = 0, PAGEN = 4;
 
 function goPage(n) {
   if (n < 0) { n = 0; }
@@ -471,6 +499,199 @@ function fillSpec(d) {
 
 
 
+// ---- 日 / 周比价走势 ------------------------------------------------------
+// 数据来自独立的 trend.json（weekly 全历史 844 点 / daily 近 5 年 1250 点），
+// 由仓库 .github/scripts/trend_update.py 生成。月末那 197 期不参与这里，
+// 但两张图的轨道仍然用月末口径（data.json 的 series），所以能看出
+// 「日线什么时候已经穿轨、但月度判定还没到」。
+var TREND = null;
+
+// src 可能是 "data.json" 也可能是绝对 URL，trend.json 永远跟它同目录
+function sibling(name) {
+  var s = qs("src");
+  if (!s) { return ""; }
+  var i = s.lastIndexOf("/");
+  return i < 0 ? name : s.slice(0, i + 1) + name;
+}
+
+function loadTrend() {
+  var url = qs("trend") || sibling("trend.json");
+  if (!url) { return; }
+  var xhr = new XMLHttpRequest();
+  xhr.timeout = 8000;
+  xhr.onreadystatechange = function () {
+    if (xhr.readyState !== 4) { return; }
+    if (xhr.status === 200 || xhr.status === 0) {
+      try { TREND = JSON.parse(xhr.responseText); }
+      catch (e) { TREND = { err: "格式错误" }; }
+    } else { TREND = { err: "离线" }; }
+    paintTrend();
+  };
+  xhr.ontimeout = function () { TREND = { err: "超时" }; paintTrend(); };
+  xhr.onerror = function () { TREND = { err: "离线" }; paintTrend(); };
+  var pageHttp = /^https?:/i.test(window.location.href);
+  var needBust = /^https?:/i.test(url) || (pageHttp && !/^file:/i.test(url));
+  var cb = needBust ? ((url.indexOf("?") < 0 ? "?_=" : "&_=") + new Date().getTime()) : "";
+  try { xhr.open("GET", url + cb, true); xhr.send(null); }
+  catch (e) { TREND = { err: "离线" }; paintTrend(); }
+}
+
+function paintTrend() {
+  if (!LAST || !TREND) { return; }   // 月度数据先到，轨道要用它
+  if (TREND.err) {
+    var msg = '<div class="tempty">走势数据没拉下来（' + TREND.err + '）。<br>'
+      + '在仓库 <b>.github/scripts</b> 下跑 <b>python trend_update.py</b> 生成 trend.json。</div>';
+    if ($("wbody")) { $("wbody").innerHTML = msg; }
+    if ($("ddbody")) { $("ddbody").innerHTML = msg; }
+    return;
+  }
+  drawTrendChart("wbody", TREND.weekly, { fill: false, dots: true, sub: "wsub", unit: "周", years: 9 });
+  drawTrendChart("ddbody", TREND.daily, { fill: true, dots: false, sub: "ddsub", unit: "日", years: 7 });
+}
+
+function fmtN(v) { return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+
+// pts 形如 [[20261120, 400], ...]（比价 ×1000）；
+// 轨道 tk 来自 LAST.series，是「月末才跳一次」的阶梯，映射到每个点上。
+function drawTrendChart(boxId, pts, opt) {
+  var box = $(boxId);
+  if (!box) { return; }
+  if (!pts || pts.length < 2) {
+    box.innerHTML = '<div class="tempty">没有下发' + opt.unit + '线数据。</div>';
+    return;
+  }
+  var W = box.clientWidth || 458, H = box.clientHeight || 352;
+  if (W < 240 || H < 120) { W = 458; H = 352; }
+  var PL = 34, PR = 8, PT = 10, PB = 20;
+  var n = pts.length, i, j, k;
+
+  // 轨道：把月末的 15%/85% 分位按日期铺到每个点上（×1000 统一单位）
+  var tk = [], ser = LAST.series || [];
+  for (i = 0; i < ser.length; i++) {
+    tk.push([parseInt(String(ser[i][0]).replace(/-/g, ""), 10),
+             Math.round(+ser[i][2] * 1000), Math.round(+ser[i][3] * 1000)]);
+  }
+  var los = [], his = [], lo = null, hi = null, ti = 0;
+  for (i = 0; i < n; i++) {
+    while (ti < tk.length && tk[ti][0] <= pts[i][0]) { lo = tk[ti][1]; hi = tk[ti][2]; ti++; }
+    los.push(lo);
+    his.push(hi);
+  }
+  // 序列可能比轨道更早（周线 2010.06 起，第一个月末在 6/30），开头这几周没有轨道
+  var k0 = 0;
+  while (k0 < n && los[k0] === null) { k0++; }
+
+  var vlo = 1e9, vhi = -1e9;
+  for (i = 0; i < n; i++) {
+    if (pts[i][1] < vlo) { vlo = pts[i][1]; }
+    if (pts[i][1] > vhi) { vhi = pts[i][1]; }
+    if (los[i] !== null && los[i] < vlo) { vlo = los[i]; }
+    if (his[i] !== null && his[i] > vhi) { vhi = his[i]; }
+  }
+  vlo = Math.floor(vlo / 20) * 20;
+  vhi = Math.ceil(vhi / 20) * 20;
+  if (vhi - vlo < 40) { vhi = vlo + 40; }
+
+  var iw = W - PL - PR, ih = H - PT - PB;
+  function X(idx) { return PL + iw * idx / (n - 1); }
+  function Y(v) { return PT + ih - (v - vlo) / (vhi - vlo) * ih; }
+
+  // 点太密就抽稀：1250 个点画在 418px 上，每像素 3 个点纯属浪费字符串
+  var step = Math.max(1, Math.floor(n / (iw * 1.6)));
+  var idx = [];
+  for (i = 0; i < n - 1; i += step) { idx.push(i); }
+  idx.push(n - 1);
+
+  var linePts = "", upPts = "", loPts = "";
+  for (j = 0; j < idx.length; j++) {
+    i = idx[j];
+    var xx = X(i).toFixed(1);
+    linePts += xx + "," + Y(pts[i][1]).toFixed(1) + " ";
+    if (i >= k0) {
+      upPts += xx + "," + Y(his[i]).toFixed(1) + " ";
+      loPts = xx + "," + Y(los[i]).toFixed(1) + " " + loPts;
+    }
+  }
+
+  var s = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '">';
+  for (k = 0; k <= 4; k++) {
+    var gv = vlo + (vhi - vlo) * k / 4, gy = Y(gv).toFixed(1);
+    s += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '" stroke="#1c2530"/>'
+      + '<text x="' + (PL - 6) + '" y="' + (Y(gv) + 3.5).toFixed(1)
+      + '" fill="#5d6b7a" font-size="9" text-anchor="end">' + (gv / 1000).toFixed(2) + '</text>';
+  }
+  // 前 36 个月末样本不足，轨道是回退值 0.62/0.40，在图上就是一段矩形+垂直跳变。
+  // 跟月度图一样画条竖虚线，免得被当成渲染错误。日线图起点晚于 2013，不会用到。
+  if (tk.length > 36) {
+    var sp = tk[36][0];
+    if (sp > pts[0][0] && sp < pts[n - 1][0]) {
+      for (i = 0; i < n; i++) { if (pts[i][0] >= sp) { break; } }
+      var sx = X(i).toFixed(1);
+      s += '<line x1="' + sx + '" y1="' + PT + '" x2="' + sx + '" y2="' + (H - PB)
+        + '" stroke="#3a4a5c" stroke-width="1" stroke-dasharray="3 3"/>';
+    }
+  }
+  if (opt.fill && upPts) {
+    s += '<polygon points="' + upPts + loPts + '" fill="#1c2733"/>';
+  }
+  if (upPts) {
+    s += '<polyline points="' + upPts + '" fill="none" stroke="#3a4a5c" stroke-width="1"/>';
+    s += '<polyline points="' + loPts + '" fill="none" stroke="#3a4a5c" stroke-width="1"/>';
+  }
+  s += '<polyline points="' + linePts + '" fill="none" stroke="#4a9eff" stroke-width="'
+    + (opt.fill ? 1.2 : 1.4) + '"/>';
+
+  // 年份刻度
+  var marks = [], lastY = -1;
+  for (i = 0; i < n; i++) {
+    var y = Math.floor(pts[i][0] / 10000);
+    if (y !== lastY) { marks.push([i, y]); lastY = y; }
+  }
+  var ystep = Math.ceil(marks.length / (opt.years || 8));
+  for (j = 0; j < marks.length; j += ystep) {
+    s += '<text x="' + X(marks[j][0]).toFixed(1) + '" y="' + (H - 6)
+      + '" fill="#5d6b7a" font-size="9" text-anchor="middle">'
+      + String(marks[j][1]).slice(2) + '</text>';
+  }
+
+  // 历史切换点（只有周线图标，月度 197 期那 5 次）
+  if (opt.dots) {
+    var sigs = LAST.history_signals || [];
+    for (j = 0; j < sigs.length; j++) {
+      var tag = parseInt(String(sigs[j].month).replace(".", ""), 10);   // 2013.06 → 201306
+      for (i = 0; i < n; i++) {
+        if (Math.floor(pts[i][0] / 100) >= tag) {
+          s += '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(pts[i][1]).toFixed(1)
+            + '" r="2.6" fill="' + (sigs[j].signal === "转红利" ? "#f0454b" : "#17b26a") + '"/>';
+          break;
+        }
+      }
+    }
+  }
+  // 末点高亮：一眼能看出当前比价落在哪
+  s += '<circle cx="' + X(n - 1).toFixed(1) + '" cy="' + Y(pts[n - 1][1]).toFixed(1)
+    + '" r="3" fill="#e3b341"/>';
+  s += '</svg>';
+  box.innerHTML = s;
+
+  var sub = $("wsub");
+  if (opt.sub === "ddsub") { sub = $("ddsub"); }
+  if (sub) {
+    var lp = pts[n - 1][1], loN = los[n - 1], hiN = his[n - 1];
+    var txt = fmtN(n) + " " + opt.unit;
+    if (opt.sub === "ddsub") {
+      // 日线这张才有「离轨道多远」的意义——周线只想知道现在什么位置。
+      // 用绝对值：正负号在这个语境下反而容易被读反。
+      if (loN !== null) { txt += "　·　距下轨 " + Math.abs((lp - loN) / lp * 100).toFixed(1) + "%"; }
+      if (hiN !== null) { txt += "　距上轨 " + Math.abs((hiN - lp) / lp * 100).toFixed(1) + "%"; }
+    } else {
+      txt += "　·　最新 " + (lp / 1000).toFixed(3);
+    }
+    sub.innerHTML = txt;
+  }
+}
+
+
 // 休市日集合，来自 data.json 的 holidays 字段（唯一事实源：仓库 .github/scripts/monthly_update.py）。
 // 缺失时自动退化为「只跳周末」，不会报错。月末判定与云端 cron 共用同一张表，避免两边说法不一致。
 var HOL = {};
@@ -578,6 +799,7 @@ function render(d) {
   LAST = d;
   drawLongChart(d.series, d.history_signals);
   fillSpec(d);
+  paintTrend();
 }
 
 function nextCheck() {
@@ -661,13 +883,14 @@ setTheme();
 layout();
 goPage(0);
 bindPager();
-tick(); loadData(); tryWakeLock();
+tick(); loadData(); loadTrend(); tryWakeLock();
 setInterval(tick, 1000); setInterval(loadData, itv);
 // 竖屏画布高度依赖 innerHeight，所以锁定时也必须重算尺寸，不能只 fit()。
 // 长图是按容器实测尺寸画的，尺寸变了要重画，否则 SVG 会跟容器对不上。
 window.onresize = function() {
   layout();
   if (LAST) { drawLongChart(LAST.series, LAST.history_signals); }
+  paintTrend();
 };
 try { document.addEventListener("visibilitychange", function() { if (!document.hidden) { tryWakeLock(); } }); } catch (e) {}
 </script>
