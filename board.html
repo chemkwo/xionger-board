@@ -616,11 +616,14 @@ function drawTrendChart(boxId, pts, opt) {
   }
 
   // 右上角标当前上下轨数值。只给数值不画线——15 天里轨道离得远（0.33 / 0.59），
-  // 画进纵轴会把曲线压成一条窄带。取最后一个已入库月末，即当前生效的轨道。
+  // 画进纵轴会把曲线压成一条窄带。
+  // 轨道是**月末比值**派生的，两张图共用 series 最后一项（最新已入库月末），
+  // 不按日线/周线各自重算；带上月末日期，免得看不出是哪次定盘的。
   var ser = LAST.series || [], last = ser.length ? ser[ser.length - 1] : null;
   if (last) {
     s += '<text x="' + (W - PR) + '" y="14" font-size="9" text-anchor="end">'
-      + '<tspan fill="#6e7d8d">下轨 </tspan><tspan fill="#4fae86">' + (+last[2]).toFixed(3) + '</tspan>'
+      + '<tspan fill="#5d6b7a">' + String(last[0]).slice(5) + ' 月末</tspan>'
+      + '<tspan fill="#6e7d8d">　下轨 </tspan><tspan fill="#4fae86">' + (+last[2]).toFixed(3) + '</tspan>'
       + '<tspan fill="#6e7d8d">　上轨 </tspan><tspan fill="#e07a7e">' + (+last[3]).toFixed(3) + '</tspan>'
       + '</text>';
   }
